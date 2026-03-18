@@ -1,4 +1,4 @@
-tensorflow>=2.17.0
+tensorflow[and-cuda]>=2.17.0
 tf-keras
 transformers>=4.40.0
 gradio>=5.0.0
