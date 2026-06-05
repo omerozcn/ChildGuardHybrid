@@ -2,7 +2,7 @@
 
 Çevrim içi metinlerde çocuklara yönelik zararlı içerik tespiti yapan iki aşamalı hibrit yapay zekâ sistemi.
 
-> Afyon Kocatepe Üniversitesi — Veri Madenciliği dersi final projesi.
+> Afyon Kocatepe Üniversitesi — Yapay Zeka dersi final projesi.
 
 ---
 
