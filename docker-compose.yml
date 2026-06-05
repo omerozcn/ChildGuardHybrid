@@ -1,0 +1,27 @@
+services:
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: childguard-backend
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./final_models:/app/final_models
+    environment:
+      - MODEL_BASE_PATH=/app/final_models
+      - ALLOWED_ORIGINS=http://localhost:3000,http://127.0.0.1:3000
+    restart: always
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: childguard-frontend
+    ports:
+      - "3000:3000"
+    environment:
+      - NEXT_PUBLIC_API_URL=http://localhost:8000
+    depends_on:
+      - backend
+    restart: always
