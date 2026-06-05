@@ -35,13 +35,18 @@ Sistem ayrıca tahminin neden o şekilde verildiğini açıklayan **SHAP** (XGBo
                                            └──────────────────┘
 ```
 
-**Hibrit skor:**
+**Hibrit skor (`backend/api/services/hybrid.py`):**
+
+XGBoost'un düşük precision sorununa karşı koruma için **gate** mantığı vardır — XGB skoru 0.65 eşiğinin altındaysa hibrit birleşime katılmaz:
 
 ```
-final_score = 0.6 * bert_score + 0.4 * xgb_score
+XGB skoru ≥ 0.65 → final = 0.6 × bert + 0.4 × xgb
+XGB skoru < 0.65 → final = bert
 ```
 
-Eşik `bert_general_config.pkl` dosyasından okunur (saklanan değer: 0.32). Skor eşiğin üzerindeyse içerik **RİSKLİ** olarak işaretlenir, sonrasında yaş grubu modeli çalıştırılır.
+Karar eşiği `hybrid.py` modülünde `THRESHOLD = 0.45` olarak sabittir. `final > 0.45` olduğunda içerik **RİSKLİ** olarak işaretlenir ve yaş grubu modeli çalıştırılır.
+
+> Not: Eğitim betiği, BERT bileşeni için F1-maksimum optimal eşiği (0.30) ayrıca öğrenip `bert_general_config.pkl` dosyasına yazar. Bu değer eğitimden gelen bilgilendirici bir çıktıdır; çalışma zamanı kararı yukarıdaki 0.45 sabiti üzerinden alınır.
 
 ---
 
@@ -173,11 +178,37 @@ docker-compose up --build
 
 ## Model Performansı
 
-| Model | Accuracy | F1 (Zararlı) |
-|---|---|---|
-| BERT — Genel | 0.92 | 0.75 |
-| XGBoost | 0.86 | 0.65 |
-| BERT — Yaş Grubu | 0.92 | 0.91 (macro) |
+Aşağıdaki değerler bu repoda yer alan eğitilmiş modellerin (`final_models/`) bağımsız test kümesi üzerindeki sonuçlarıdır; Weights & Biases `childguard-v3` projesinden çekilmiştir.
+
+| Model | Accuracy | Precision | Recall | F1 |
+|---|---|---|---|---|
+| BERT — Genel (Aşama 1) | 0.9123 | 0.7460 | 0.7556 | 0.7508 |
+| XGBoost (Aşama 1) | 0.6034 | 0.2511 | 0.6399 | 0.3607 |
+| BERT — Yaş Grubu (Aşama 2, macro) | 0.9502 | 0.9470 | 0.9488 | 0.9478 |
+
+XGBoost'un düşük precision değeri nedeniyle, runtime'da yalnızca skor 0.65 eşiğini aştığında karara dahil edilir (yukarıda anlatılan gate mantığı).
+
+---
+
+## Veri Kümesi
+
+Eğitim, **ChildGuard** veri kümesi üzerinde gerçekleştirilmiştir:
+
+> Kashyap, G. S., Azeez, M. A., Ali, R., Siddiqui, Z. H., Gao, J., & Naseem, U. (2025). *ChildGuard: A Specialized Dataset for Combatting Child-Targeted Hate Speech.* arXiv:2506.21613v2.
+
+351.877 örnek; üç platformdan (Reddit, X, YouTube) toplanmış; üç yaş grubuna (Younger Children, Pre-Teens, Teens) göre etiketlenmiştir. Veri kümesi erişimi için ilgili makalenin GitHub sayfasına bakınız.
+
+---
+
+## Eğitim
+
+`childguardhybrid_colab_v4.py` Google Colab üzerinde W&B entegrasyonlu olarak çalışacak şekilde yazılmıştır. Kendi eğitimini yapmak için:
+
+1. ChildGuard CSV'lerini Google Drive'a koy.
+2. Scripti Colab'da aç, ilk hücredeki yolları kendi Drive yapına göre düzenle.
+3. Hücreleri sırayla çalıştır — eğitim sonunda `final_models/` klasörü ve `ChildGuard_v3_Bundle.zip` üretilir.
+
+GPU gereklidir (Colab T4/A100 yeterli). Tahmini süre: BERT genel ~45-60 dk, XGBoost + Optuna ~20-30 dk, BERT yaş grubu ~20-30 dk.
 
 ---
 
@@ -189,6 +220,24 @@ docker-compose up --build
 
 ---
 
+## Atıf
+
+Bu repoyu çalışmanızda kullanırsanız hem bu projeye hem de temel aldığımız ChildGuard veri kümesine atıfta bulunmanız beklenir:
+
+```bibtex
+@misc{kashyap2025childguard,
+  title  = {ChildGuard: A Specialized Dataset for Combatting Child-Targeted Hate Speech},
+  author = {Kashyap, Gautam Siddharth and Azeez, Mohammad Anas and Ali, Rafiq and
+            Siddiqui, Zohaib Hasan and Gao, Jiechao and Naseem, Usman},
+  year   = {2025},
+  eprint = {2506.21613},
+  archivePrefix = {arXiv},
+  primaryClass  = {cs.CL}
+}
+```
+
+---
+
 ## Lisans
 
-Akademik kullanım için açıktır. Detaylı bilgi için iletişime geçin.
+Akademik kullanım için açıktır. Ticari kullanım veya yeniden dağıtım öncesinde lütfen depo sahibiyle iletişime geçin.
