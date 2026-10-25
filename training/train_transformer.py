@@ -30,7 +30,7 @@ import torch
 from sklearn.metrics import average_precision_score
 from transformers import (AutoModelForSequenceClassification, AutoTokenizer,
                           DataCollatorWithPadding, EarlyStoppingCallback, Trainer,
-                          TrainingArguments, set_seed)
+                          TrainerCallback, TrainingArguments, set_seed)
 
 from childguard.labels import LABELS
 from childguard.text import for_transformer
@@ -70,6 +70,33 @@ class MaskedBCETrainer(Trainer):
         outputs = model(**inputs)
         loss = masked_bce(outputs.logits, labels, self.pos_weight)
         return (loss, outputs) if return_outputs else loss
+
+
+class StepTimer(TrainerCallback):
+    """Yalnızca eğitim adımlarının süresini ölçer.
+
+    HF'nin `train_runtime` değeri ara değerlendirme ve checkpoint kaydetmeyi
+    de içerir; büyük modellerde kayıt süresi baskın olduğu için süre
+    tahmini katlarca şişer.
+    """
+
+    def __init__(self):
+        self.seconds, self.steps, self._t = 0.0, 0, None
+
+    def on_step_begin(self, args, state, control, **kw):
+        if torch.cuda.is_available():
+            torch.cuda.synchronize()
+        self._t = time.perf_counter()
+
+    def on_step_end(self, args, state, control, **kw):
+        if self._t is None:
+            return
+        if torch.cuda.is_available():
+            torch.cuda.synchronize()
+        if self.steps > 0:                       # ilk adım (ısınma) sayılmaz
+            self.seconds += time.perf_counter() - self._t
+        self.steps += 1
+        self._t = None
 
 
 def compute_metrics(pred):
@@ -260,7 +287,7 @@ def main():
         eval_steps=eval_steps,
         save_strategy="steps",
         save_steps=eval_steps,
-        save_total_limit=2,
+        save_total_limit=1,            # HF en iyi checkpoint'i ayrıca korur
         load_best_model_at_end=True,
         metric_for_best_model="pr_auc_macro",
         greater_is_better=True,
@@ -276,20 +303,20 @@ def main():
     print("Belirteçlere ayrılıyor...", flush=True)
     train_ds = TextDataset(train, tok, args.max_len)
     val_ds = TextDataset(val, tok, args.max_len)
+    timer = StepTimer()
     trainer = MaskedBCETrainer(
         model=model, args=targs,
         train_dataset=train_ds, eval_dataset=val_ds,
         data_collator=DataCollatorWithPadding(tok),
         compute_metrics=compute_metrics,
-        callbacks=[EarlyStoppingCallback(early_stopping_patience=3)],
+        callbacks=[EarlyStoppingCallback(early_stopping_patience=3), timer],
         pos_weight=pos_weight,
     )
-    train_out = trainer.train(resume_from_checkpoint=True if resume else None)
-    # HF'nin train_samples_per_second değeri ara değerlendirmeleri de kapsar;
-    # süre tahmini için yalnızca eğitim adımlarının hızını hesapla.
+    trainer.train(resume_from_checkpoint=True if resume else None)
     eval_secs = sum(h.get("eval_runtime", 0) for h in trainer.state.log_history)
-    train_secs = max(train_out.metrics.get("train_runtime", 0) - eval_secs, 1e-6)
-    pure_sps = trainer.state.global_step * args.bs * args.grad_accum / train_secs
+    pure_sps = ((timer.steps - 1) * args.bs * args.grad_accum / timer.seconds
+                if timer.steps > 1 and timer.seconds > 0 else 0.0)
+    print(f"Saf eğitim hızı: ~{pure_sps:.0f} örnek/s", flush=True)
     metrics = trainer.evaluate()
 
     out = paths.model_dir() / "transformer"

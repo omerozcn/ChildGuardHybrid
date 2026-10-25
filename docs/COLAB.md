@@ -22,14 +22,17 @@ print("Disk   :", round(shutil.disk_usage("/content").free/2**30), "GB boş")
 ## Adım 2 — Drive
 ```python
 from google.colab import drive
-import os
+import os, shutil
 drive.mount("/content/drive")
 WORK = "/content/drive/MyDrive/ChildGuard_v4"
 for sub in ["checkpoints", "models", "reports", "hf_cache"]:
     os.makedirs(f"{WORK}/{sub}", exist_ok=True)
 os.environ["HF_HOME"] = f"{WORK}/hf_cache"
-os.environ["CG_WORK"] = WORK          # bütün çıktılar Drive'a yazılır
+os.environ["CG_WORK"] = WORK                      # veri, model ve rapor Drive'a
+os.environ["CG_CKPT"] = "/content/cg_checkpoints" # checkpoint'ler hızlı yerel diske (her biri ~4 GB)
 print(WORK, os.listdir(WORK))
+du = shutil.disk_usage("/content/drive/MyDrive")
+print(f"Drive: {du.free/2**30:.0f} GB boş / {du.total/2**30:.0f} GB")
 ```
 
 ## Adım 3 — Kütüphaneler
@@ -70,7 +73,8 @@ Son satırda **`✅ SMOKE OK`** görmelisiniz. Görmüyorsanız tam eğitime ge�
 
 ## Adım 7 — Tam eğitim (~1–2 saat)
 Duman testinde ölçülen hıza göre tahmini süreyi başta yazar. Oturum düşerse **aynı hücreyi tekrar çalıştırın**:
-tamamlanan aşamalar atlanır, transformer son checkpoint'ten devam eder.
+tamamlanan aşamalar (veri, sözcüksel model — Drive'da) atlanır. Checkpoint'ler yerel diskte olduğu için
+oturum *tamamen* sıfırlanırsa transformer baştan eğitilir; yalnızca hücre/çekirdek yeniden başlarsa kaldığı yerden devam eder.
 ```python
 !python -u -m training.run_all --profile full
 ```

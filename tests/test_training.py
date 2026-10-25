@@ -203,6 +203,7 @@ def test_end_to_end_pipeline(work, monkeypatch):
     tdir = work / "models" / "v4" / "transformer"
     meta = json.loads((tdir / "training_meta.json").read_text())
     assert meta["base_model"] == TINY_MODEL
+    assert meta["train_samples_per_second"] > 0       # süre tahmini için saf adım hızı
 
     # Aynı komut tekrar çalışınca checkpoint'ten devam etmeli (çökmeden).
     _main(train_transformer, ["--preset", "none", "--model", TINY_MODEL, "--bs", "4",
@@ -228,6 +229,14 @@ def test_end_to_end_pipeline(work, monkeypatch):
     r = model.predict(["kys", "hello friend"])
     assert r[0]["harmful"] and set(r[1]["scores"]) == set(LABELS)
     assert len(model.explain("you are a loser")["words"]) == 4
+
+
+def test_checkpoint_dir_can_live_outside_work(tmp_path, monkeypatch):
+    monkeypatch.setenv("CG_WORK", str(tmp_path / "drive"))
+    assert paths.checkpoint_dir() == tmp_path / "drive" / "checkpoints"
+    monkeypatch.setenv("CG_CKPT", str(tmp_path / "local_ckpt"))
+    assert paths.checkpoint_dir() == tmp_path / "local_ckpt"
+    assert paths.model_dir() == tmp_path / "drive" / "models" / "v4"
 
 
 def test_lexical_only_pipeline(work, monkeypatch):

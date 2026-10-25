@@ -29,6 +29,14 @@ def data_dir() -> Path:
 
 
 def checkpoint_dir() -> Path:
+    """`CG_CKPT` ayarlıysa oraya yazılır.
+
+    Colab'da checkpoint'leri Drive yerine yerel diske koymak gerekir: büyük
+    modellerde her biri optimizer durumuyla birkaç GB'dır, Drive kotasını
+    doldurur ve yazması eğitimi yavaşlatır.
+    """
+    if os.environ.get("CG_CKPT"):
+        return Path(os.environ["CG_CKPT"])
     w = _work()
     return w / "checkpoints" if w else ROOT / "data" / "checkpoints"
 

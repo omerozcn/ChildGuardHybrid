@@ -16,6 +16,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import shutil
 import subprocess
 import sys
 import time
@@ -35,8 +36,12 @@ def run(*args: str, env: dict | None = None):
 def smoke(args) -> None:
     base = paths._work() or paths.ROOT / "data"
     work = base / "smoke"
-    env = {**os.environ, "CG_WORK": str(work), "PYTHONIOENCODING": "utf-8"}
-    print(f"🔥 DUMAN TESTİ — çalışma klasörü: {work}")
+    # Duman testi asıl eğitimin checkpoint'lerine asla dokunmamalı (--fresh siler).
+    ckpt = paths.checkpoint_dir()
+    smoke_ckpt = ckpt.parent / f"{ckpt.name}_smoke"
+    env = {**os.environ, "CG_WORK": str(work), "CG_CKPT": str(smoke_ckpt),
+           "PYTHONIOENCODING": "utf-8"}
+    print(f"🔥 DUMAN TESTİ — çalışma klasörü: {work}\n   checkpoint: {smoke_ckpt}")
     t0 = time.time()
     run("training.prepare_data", "--profile", "smoke", env=env)
     run("training.train_lexical", "--C", "1.0", env=env)
@@ -63,7 +68,9 @@ def smoke(args) -> None:
     if meta_path.exists():
         meta = json.loads(meta_path.read_text(encoding="utf-8"))
         sps = meta.get("train_samples_per_second")
-        print(f"\nModel: {meta['base_model']} · eğitim hızı ≈ {sps:.0f} örnek/s" if sps else "")
+        print(f"\nModel: {meta['base_model']} · saf eğitim hızı ≈ {sps:.0f} örnek/s" if sps else "")
+    # Duman testinin checkpoint'leri büyük (roberta-large: ~4 GB) ve artık gereksiz.
+    shutil.rmtree(smoke_ckpt, ignore_errors=True)
     print(f"\n✅ SMOKE OK — tüm aşamalar çalıştı ({(time.time() - t0) / 60:.1f} dk). "
           f"Tam eğitime geçebilirsiniz.")
 
@@ -89,6 +96,11 @@ def estimate(train_rows: int, epochs: float) -> None:
 def full(args) -> None:
     data, models = paths.data_dir(), paths.model_dir()
     print(f"📁 Veri: {data}\n📁 Model: {models}\n📁 Checkpoint: {paths.checkpoint_dir()}")
+    free = shutil.disk_usage(paths.checkpoint_dir().parent if paths.checkpoint_dir().parent.exists()
+                             else paths.ROOT).free / 2**30
+    print(f"💾 Checkpoint diskinde boş alan: {free:.0f} GB", flush=True)
+    if free < 12:
+        print("⚠️  Büyük modelde checkpoint başına ~4 GB gerekir; alan dar olabilir.", flush=True)
 
     stats = data / "stats.json"
     have_data = stats.exists() and json.loads(stats.read_text(encoding="utf-8")).get(
