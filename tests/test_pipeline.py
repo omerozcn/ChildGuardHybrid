@@ -31,6 +31,31 @@ def test_explain_returns_word_and_ngram_weights(tiny_model):
     assert e["ngrams"]
 
 
+def _fixed_model(tiny_model, monkeypatch, probs: dict):
+    from childguard.pipeline import ChildGuardModel
+
+    config = {**tiny_model.config,
+              "thresholds": {l: {"flag": 0.5, "high": 0.8} for l in LABELS}}
+    config["thresholds"]["threat"] = {"flag": 0.05, "high": 0.8}
+    model = ChildGuardModel(config, tiny_model.lexical, None)
+    row = np.array([[probs.get(l, 0.0) for l in LABELS]])
+    monkeypatch.setattr(model, "raw_proba", lambda texts: np.repeat(row, len(texts), axis=0))
+    return model
+
+
+def test_low_type_flag_does_not_make_message_harmful(tiny_model, monkeypatch):
+    # "this chili is going to kill me": tehdit kendi düşük eşiğini aşar ama kesin değildir.
+    model = _fixed_model(tiny_model, monkeypatch, {"toxicity": 0.1, "threat": 0.3})
+    r = model.predict(["this chili is going to kill me"])[0]
+    assert r["flags"]["threat"] and not r["harmful"]
+
+
+def test_high_risk_type_raises_overall_score(tiny_model, monkeypatch):
+    model = _fixed_model(tiny_model, monkeypatch, {"toxicity": 0.1, "threat": 0.95})
+    r = model.predict(["i am going to end you"])[0]
+    assert r["harmful"] and r["scores"]["toxicity"] >= 0.5
+
+
 def test_stacker_handles_missing_lexical_label():
     s = Stacker({l: {"transformer": 1.0, "lexical": 1.0, "bias": 0.0} for l in LABELS})
     p_l = np.full((1, len(LABELS)), np.nan)

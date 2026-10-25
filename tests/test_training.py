@@ -233,6 +233,26 @@ def test_end_to_end_pipeline(work, monkeypatch):
     assert len(model.explain("you are a loser")["words"]) == 4
 
 
+def test_threshold_policy_falls_back_when_precision_too_low():
+    from training.calibrate import pick_thresholds
+
+    rng = np.random.default_rng(0)
+    # Nadir ve zor ayrışan etiket: %90 recall ancak çok düşük precision'la mümkün.
+    y = np.r_[np.ones(100), np.zeros(5000)].astype(int)
+    p = np.r_[rng.beta(4, 2, 100), rng.beta(1.5, 4, 5000)]
+    naive = pick_thresholds(y, p, "threat", target_recall=0.90, min_precision=0.0)
+    t = pick_thresholds(y, p, "threat", target_recall=0.90, min_precision=0.40)
+    assert naive["policy"].startswith("recall") and naive["val_precision"] < 0.40
+    assert t["policy"].startswith("f2")
+    assert t["flag"] >= naive["flag"] and t["val_precision"] >= naive["val_precision"]
+
+    # Kolay ayrışan etiket: recall hedefi yüksek precision'la tutturulur, politika değişmez.
+    p_easy = np.r_[rng.beta(8, 2, 100), rng.beta(2, 8, 5000)]
+    t2 = pick_thresholds(y, p_easy, "threat", target_recall=0.90, min_precision=0.40)
+    assert t2["policy"].startswith("recall") and t2["val_recall"] >= 0.90
+    assert t2["high"] >= t2["flag"]
+
+
 def test_corrupt_cached_weights_trigger_one_redownload():
     pytest.importorskip("torch")
     from training.train_transformer import load_with_retry

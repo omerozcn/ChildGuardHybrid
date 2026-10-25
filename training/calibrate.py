@@ -6,8 +6,11 @@ tarafından en sonda bir kez kullanılır.
 
 Eşik politikası:
   * flag: Güvenlik açısından kritik etiketlerde (toxicity, threat, sexual)
-    hedef recall'u (varsayılan 0.90) sağlayan en yüksek eşik; diğerlerinde
-    F1'i en yüksek yapan eşik.
+    hedef recall'u (varsayılan 0.90) sağlayan en yüksek eşik — ancak o
+    noktada precision ≥ `--min-precision` (0.40) ise. Değilse recall'u
+    ağırlıklı tutan F2'yi en yüksek yapan eşik. (v4.0'da tehdit eşiği bu
+    kontrol olmadığı için 0.026'ya inmiş, "kill/die" geçen masum cümleler
+    alarm vermişti.) Diğer etiketlerde F1'i en yüksek yapan eşik.
   * high: precision ≥ 0.90 sağlayan en düşük eşik ("yüksek risk").
 
     python -m training.calibrate
@@ -34,26 +37,39 @@ from training import paths
 SAFETY_CRITICAL = {"toxicity", "threat", "sexual"}
 
 
-def pick_thresholds(y: np.ndarray, p: np.ndarray, label: str, target_recall: float) -> dict:
+def _f_beta(prec: np.ndarray, rec: np.ndarray, beta: float) -> np.ndarray:
+    b2 = beta * beta
+    return (1 + b2) * prec * rec / np.clip(b2 * prec + rec, 1e-9, None)
+
+
+def pick_thresholds(y: np.ndarray, p: np.ndarray, label: str, target_recall: float,
+                    min_precision: float = 0.40) -> dict:
     prec, rec, thr = precision_recall_curve(y, p)
     prec, rec = prec[:-1], rec[:-1]               # thr ile aynı uzunluk
+    policy = "f1"
     if label in SAFETY_CRITICAL:
         ok = np.where(rec >= target_recall)[0]
         i = ok[-1] if len(ok) else int(np.argmax(rec))
+        policy = f"recall≥{target_recall}"
+        if prec[i] < min_precision:
+            i = int(np.argmax(_f_beta(prec, rec, 2.0)))
+            policy = f"f2 (recall≥{target_recall} noktasında precision {prec[ok[-1] if len(ok) else i]:.2f} < {min_precision})"
     else:
-        f1 = 2 * prec * rec / np.clip(prec + rec, 1e-9, None)
-        i = int(np.argmax(f1))
+        i = int(np.argmax(_f_beta(prec, rec, 1.0)))
     flag = float(thr[i])
     hi = np.where((prec >= 0.90) & (thr >= flag))[0]
     high = float(thr[hi[0]]) if len(hi) else max(flag, 0.9)
     return {"flag": round(flag, 4), "high": round(high, 4),
-            "val_precision": round(float(prec[i]), 4), "val_recall": round(float(rec[i]), 4)}
+            "val_precision": round(float(prec[i]), 4), "val_recall": round(float(rec[i]), 4),
+            "policy": policy}
 
 
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--model-dir", default=None)
     ap.add_argument("--target-recall", type=float, default=0.90)
+    ap.add_argument("--min-precision", type=float, default=0.40,
+                    help="Güvenlik etiketlerinde hedef recall noktasında kabul edilen en düşük precision")
     ap.add_argument("--no-transformer", action="store_true")
     args = ap.parse_args()
 
@@ -95,7 +111,7 @@ def main():
             "bias": float(lr.intercept_[0]),
         }
         p = lr.predict_proba(Z)[:, 1]
-        thresholds[label] = pick_thresholds(y, p, label, args.target_recall)
+        thresholds[label] = pick_thresholds(y, p, label, args.target_recall, args.min_precision)
         metrics[label] = {
             "val_pr_auc": round(float(average_precision_score(y, p)), 4),
             "val_roc_auc": round(float(roc_auc_score(y, p)), 4),
@@ -105,8 +121,10 @@ def main():
                if p_t is not None else {}),
             "n": int(known.sum()), "positives": int(y.sum()),
         }
+        t = thresholds[label]
         print(f"  {label:14s} PR-AUC={metrics[label]['val_pr_auc']:.3f} "
-              f"flag={thresholds[label]['flag']:.3f} high={thresholds[label]['high']:.3f}")
+              f"flag={t['flag']:.3f} (P={t['val_precision']:.2f} R={t['val_recall']:.2f}) "
+              f"high={t['high']:.3f} · {t['policy']}")
 
     config = {
         "version": __version__,
@@ -116,11 +134,16 @@ def main():
         "base_model": meta.get("base_model"),
         "max_len": meta.get("max_len", 128),
         "target_recall": args.target_recall,
+        "min_precision": args.min_precision,
         "stacker": stacker,
         "thresholds": thresholds,
         "val_metrics": metrics,
     }
-    (model_dir / "config.json").write_text(json.dumps(config, indent=2), encoding="utf-8")
+    cfg_path = model_dir / "config.json"
+    if cfg_path.exists():                                   # önceki kalibrasyonu sakla
+        (model_dir / "config.prev.json").write_text(cfg_path.read_text(encoding="utf-8"),
+                                                    encoding="utf-8")
+    cfg_path.write_text(json.dumps(config, indent=2), encoding="utf-8")
     print(f"✅ Yazıldı: {model_dir / 'config.json'}")
 
 
