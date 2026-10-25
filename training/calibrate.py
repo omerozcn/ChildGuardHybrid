@@ -1,0 +1,128 @@
+"""Yığınlama (stacking), kalibrasyon ve eşik seçimi — yalnızca DOĞRULAMA setinde.
+
+Mevcut projedeki hatanın (eşik ve Optuna'nın test setinde seçilmesi) tersine,
+burada bütün ayarlar validation üzerinde yapılır; test seti `evaluate.py`
+tarafından en sonda bir kez kullanılır.
+
+Eşik politikası:
+  * flag: Güvenlik açısından kritik etiketlerde (toxicity, threat, sexual)
+    hedef recall'u (varsayılan 0.90) sağlayan en yüksek eşik; diğerlerinde
+    F1'i en yüksek yapan eşik.
+  * high: precision ≥ 0.90 sağlayan en düşük eşik ("yüksek risk").
+
+    python -m training.calibrate
+"""
+
+from __future__ import annotations
+
+import argparse
+import json
+from datetime import date
+from pathlib import Path
+
+import joblib
+import numpy as np
+import pandas as pd
+from sklearn.linear_model import LogisticRegression
+from sklearn.metrics import average_precision_score, precision_recall_curve, roc_auc_score
+
+from childguard import __version__
+from childguard.labels import LABELS
+from childguard.pipeline import TransformerModel, _logit
+from training import paths
+
+SAFETY_CRITICAL = {"toxicity", "threat", "sexual"}
+
+
+def pick_thresholds(y: np.ndarray, p: np.ndarray, label: str, target_recall: float) -> dict:
+    prec, rec, thr = precision_recall_curve(y, p)
+    prec, rec = prec[:-1], rec[:-1]               # thr ile aynı uzunluk
+    if label in SAFETY_CRITICAL:
+        ok = np.where(rec >= target_recall)[0]
+        i = ok[-1] if len(ok) else int(np.argmax(rec))
+    else:
+        f1 = 2 * prec * rec / np.clip(prec + rec, 1e-9, None)
+        i = int(np.argmax(f1))
+    flag = float(thr[i])
+    hi = np.where((prec >= 0.90) & (thr >= flag))[0]
+    high = float(thr[hi[0]]) if len(hi) else max(flag, 0.9)
+    return {"flag": round(flag, 4), "high": round(high, 4),
+            "val_precision": round(float(prec[i]), 4), "val_recall": round(float(rec[i]), 4)}
+
+
+def main():
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--model-dir", default=None)
+    ap.add_argument("--target-recall", type=float, default=0.90)
+    ap.add_argument("--no-transformer", action="store_true")
+    args = ap.parse_args()
+
+    model_dir = Path(args.model_dir) if args.model_dir else paths.model_dir()
+    val = pd.read_parquet(paths.data_dir() / "val.parquet")
+    texts = val["text"].tolist()
+    lexical = joblib.load(model_dir / "lexical.joblib")
+    p_l = lexical.predict_proba(texts)
+
+    p_t, meta = None, {}
+    tdir = model_dir / "transformer"
+    if not args.no_transformer and tdir.is_dir():
+        meta = json.loads((tdir / "training_meta.json").read_text(encoding="utf-8"))
+        tm = TransformerModel(tdir, max_len=meta.get("max_len", 128))
+        print(f"Transformer tahminleri ({len(texts):,} satır, {tm.device})...")
+        p_t = tm.predict_proba(texts, batch_size=64)
+
+    stacker, thresholds, metrics = {}, {}, {}
+    for j, label in enumerate(LABELS):
+        known = (val[label] >= 0).values & ~np.isnan(p_l[:, j])
+        y = (val.loc[known, label] >= 0.5).astype(int).values
+        if known.sum() < 30 or y.sum() < 5 or y.sum() == len(y):
+            # Kalibre edecek veri yok: modelin ham çıktısını kullan.
+            stacker[label] = {"transformer": 1.0 if p_t is not None else 0.0,
+                              "lexical": 0.0 if p_t is not None else 1.0, "bias": 0.0}
+            thresholds[label] = {"flag": 0.5, "high": 0.9, "val_precision": None,
+                                 "val_recall": None}
+            print(f"  {label:14s} kalibrasyon atlandı (yetersiz doğrulama verisi)")
+            continue
+        feats = [_logit(np.nan_to_num(p_l[known, j], nan=0.5))]
+        if p_t is not None:
+            feats.insert(0, _logit(p_t[known, j]))
+        Z = np.column_stack(feats)
+        lr = LogisticRegression(C=1.0).fit(Z, y)
+        coef = lr.coef_[0]
+        stacker[label] = {
+            "transformer": float(coef[0]) if p_t is not None else 0.0,
+            "lexical": float(coef[-1]),
+            "bias": float(lr.intercept_[0]),
+        }
+        p = lr.predict_proba(Z)[:, 1]
+        thresholds[label] = pick_thresholds(y, p, label, args.target_recall)
+        metrics[label] = {
+            "val_pr_auc": round(float(average_precision_score(y, p)), 4),
+            "val_roc_auc": round(float(roc_auc_score(y, p)), 4),
+            "val_pr_auc_lexical": round(float(average_precision_score(y, p_l[known, j])), 4),
+            **({"val_pr_auc_transformer":
+                round(float(average_precision_score(y, p_t[known, j])), 4)}
+               if p_t is not None else {}),
+            "n": int(known.sum()), "positives": int(y.sum()),
+        }
+        print(f"  {label:14s} PR-AUC={metrics[label]['val_pr_auc']:.3f} "
+              f"flag={thresholds[label]['flag']:.3f} high={thresholds[label]['high']:.3f}")
+
+    config = {
+        "version": __version__,
+        "trained_on": date.today().isoformat(),
+        "labels": LABELS,
+        "uses_transformer": p_t is not None,
+        "base_model": meta.get("base_model"),
+        "max_len": meta.get("max_len", 128),
+        "target_recall": args.target_recall,
+        "stacker": stacker,
+        "thresholds": thresholds,
+        "val_metrics": metrics,
+    }
+    (model_dir / "config.json").write_text(json.dumps(config, indent=2), encoding="utf-8")
+    print(f"✅ Yazıldı: {model_dir / 'config.json'}")
+
+
+if __name__ == "__main__":
+    main()

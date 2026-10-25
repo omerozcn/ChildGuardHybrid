@@ -3,12 +3,12 @@ import { AnalyzeResponse } from "./api";
 export interface HistoryEntry {
   id: string;
   text: string;
-  age_group: string;
   result: AnalyzeResponse;
   timestamp: number;
 }
 
-const KEY = "childguard_history";
+// v4 yanıt biçimi farklı olduğu için eski (v3) geçmiş kayıtları ayrı anahtarda kalır.
+const KEY = "childguard_history_v4";
 
 export function getHistory(): HistoryEntry[] {
   if (typeof window === "undefined") return [];
@@ -22,15 +22,21 @@ export function getHistory(): HistoryEntry[] {
 export function addHistory(entry: Omit<HistoryEntry, "id">): HistoryEntry {
   const item: HistoryEntry = { ...entry, id: crypto.randomUUID() };
   const list = [item, ...getHistory()].slice(0, 50);
-  localStorage.setItem(KEY, JSON.stringify(list));
+  try {
+    localStorage.setItem(KEY, JSON.stringify(list));
+  } catch {}
   return item;
 }
 
 export function deleteHistory(id: string): void {
   const list = getHistory().filter((e) => e.id !== id);
-  localStorage.setItem(KEY, JSON.stringify(list));
+  try {
+    localStorage.setItem(KEY, JSON.stringify(list));
+  } catch {}
 }
 
 export function clearHistory(): void {
-  localStorage.removeItem(KEY);
+  try {
+    localStorage.removeItem(KEY);
+  } catch {}
 }

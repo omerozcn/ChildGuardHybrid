@@ -1,67 +1,73 @@
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
-export interface AgePrediction {
-  predicted: string;
-  scores: Record<string, number>;
+export interface CategoryResult {
+  name: string;
+  display_name: string;
+  score: number;
+  flagged: boolean;
+  threshold: number;
 }
+
+export interface RuleHit {
+  name: string;
+  description: string;
+  match: string;
+}
+
+export type RiskLevel = "low" | "medium" | "high";
 
 export interface AnalyzeResponse {
-  label: string;
-  final_score: number;
-  bert_score: number;
-  xgb_score: number;
-  age_group: string;
-  age_prediction: AgePrediction | null;
+  harmful: boolean;
+  risk_level: RiskLevel;
+  score: number;
+  categories: CategoryResult[];
+  targets_minor: CategoryResult;
+  rule_hits: RuleHit[];
+  language_warning: boolean;
+  model_version: string;
 }
 
-export interface FeatureWeight {
+export interface TokenWeight {
   token: string;
   weight: number;
 }
 
 export interface ExplainResponse {
-  features: FeatureWeight[];
-}
-
-export interface HealthModel {
-  name: string;
-  loaded: boolean;
-  path: string;
+  label: string;
+  base_score: number;
+  words: TokenWeight[];
+  ngrams: TokenWeight[];
 }
 
 export interface HealthResponse {
-  status: string;
-  models: HealthModel[];
+  status: "ok" | "degraded";
+  model_version: string | null;
+  base_model: string | null;
+  uses_transformer: boolean;
+  device: string | null;
+  error: string | null;
 }
 
-export async function analyze(text: string, age_group: string): Promise<AnalyzeResponse> {
-  const res = await fetch(`${API_URL}/api/analyze`, {
+async function post<T>(path: string, body: unknown): Promise<T> {
+  const res = await fetch(`${API_URL}${path}`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ text, age_group }),
+    body: JSON.stringify(body),
   });
-  if (!res.ok) throw new Error(await res.text());
+  if (!res.ok) {
+    let detail = await res.text();
+    try { detail = JSON.parse(detail).detail ?? detail; } catch {}
+    throw new Error(typeof detail === "string" ? detail : JSON.stringify(detail));
+  }
   return res.json();
 }
 
-export async function explainShap(text: string, age_group: string): Promise<ExplainResponse> {
-  const res = await fetch(`${API_URL}/api/explain/shap`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ text, age_group }),
-  });
-  if (!res.ok) throw new Error(await res.text());
-  return res.json();
+export function analyze(text: string): Promise<AnalyzeResponse> {
+  return post("/api/analyze", { text });
 }
 
-export async function explainLime(text: string, age_group: string, num_samples = 500): Promise<ExplainResponse> {
-  const res = await fetch(`${API_URL}/api/explain/lime`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ text, age_group, num_samples }),
-  });
-  if (!res.ok) throw new Error(await res.text());
-  return res.json();
+export function explain(text: string, label = "toxicity"): Promise<ExplainResponse> {
+  return post("/api/explain", { text, label });
 }
 
 export async function health(): Promise<HealthResponse> {

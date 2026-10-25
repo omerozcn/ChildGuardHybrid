@@ -40,3 +40,10 @@ yarn-error.log*
 # W&B / model artefaktları
 wandb/
 *.ipynb_checkpoints/
+
+# v4 eğitim çıktıları (yeniden üretilebilir)
+data/processed/
+data/checkpoints/
+data/hf_cache/
+data/smoke/
+reports/

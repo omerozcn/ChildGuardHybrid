@@ -1,56 +1,62 @@
-from pydantic import BaseModel, Field
 from typing import Literal, Optional
+
+from pydantic import BaseModel, Field
 
 
 class AnalyzeRequest(BaseModel):
     text: str = Field(..., min_length=1, max_length=5000)
-    age_group: Literal["Younger", "Pre-Teen", "Teen"] = Field(
-        ..., description="XGBoost feature için kullanıcı seçimi"
-    )
 
 
-class ExplainRequest(BaseModel):
-    text: str = Field(..., min_length=1, max_length=5000)
-    age_group: Literal["Younger", "Pre-Teen", "Teen"]
+class BatchAnalyzeRequest(BaseModel):
+    texts: list[str] = Field(..., min_length=1, max_length=64)
 
 
-class LimeRequest(ExplainRequest):
-    num_samples: int = Field(default=500, ge=100, le=2000)
+class CategoryResult(BaseModel):
+    name: str
+    display_name: str
+    score: float
+    flagged: bool
+    threshold: float
 
 
-class AgePrediction(BaseModel):
-    predicted: str
-    scores: dict[str, float]
+class RuleHit(BaseModel):
+    name: str
+    description: str
+    match: str
 
 
 class AnalyzeResponse(BaseModel):
-    label:          Literal["🚨 RİSKLİ / SİBER ZORBALIK", "✅ GÜVENLİ / TEMİZ"]
-    final_score:    float
-    bert_score:     float
-    xgb_score:      float
-    age_group:      str
-    age_prediction: Optional[AgePrediction] = None
+    harmful: bool
+    risk_level: Literal["low", "medium", "high"]
+    score: float
+    categories: list[CategoryResult]
+    targets_minor: CategoryResult
+    rule_hits: list[RuleHit]
+    language_warning: bool
+    model_version: str
 
 
-class FeatureWeight(BaseModel):
-    token:  str
+class ExplainRequest(BaseModel):
+    text: str = Field(..., min_length=1, max_length=1000)
+    label: str = "toxicity"
+
+
+class TokenWeight(BaseModel):
+    token: str
     weight: float
 
 
-class ShapResponse(BaseModel):
-    features: list[FeatureWeight]
-
-
-class LimeResponse(BaseModel):
-    features: list[FeatureWeight]
-
-
-class HealthModel(BaseModel):
-    name:   str
-    loaded: bool
-    path:   str
+class ExplainResponse(BaseModel):
+    label: str
+    base_score: float
+    words: list[TokenWeight]
+    ngrams: list[TokenWeight]
 
 
 class HealthResponse(BaseModel):
     status: Literal["ok", "degraded"]
-    models: list[HealthModel]
+    model_version: Optional[str] = None
+    base_model: Optional[str] = None
+    uses_transformer: bool = False
+    device: Optional[str] = None
+    error: Optional[str] = None

@@ -1,243 +1,125 @@
-# ChildGuard AI v3.0
+# ChildGuard AI v4
 
-Çevrim içi metinlerde çocuklara yönelik zararlı içerik tespiti yapan iki aşamalı hibrit yapay zekâ sistemi.
+İngilizce çevrim içi mesajlarda çocuklar için zararlı içeriği tespit eden, **çok etiketli** ve açıklanabilir bir sınıflandırma sistemi.
 
 > Afyon Kocatepe Üniversitesi — Yapay Zeka dersi final projesi.
 
----
+Tek bir "zararlı mı?" kararı yerine her mesaj için risk türleri ayrı ayrı puanlanır:
 
-## Genel Bakış
+| Etiket | Anlam |
+|---|---|
+| Zararlı içerik | Genel karar (risk seviyesi: düşük / orta / yüksek) |
+| Hakaret / aşağılama | Küçümseme, alay, dışlama dahil |
+| Tehdit / kendine zarar | Şiddet tehdidi ve "kys" tipi kendine zarar teşviki |
+| Cinsel içerik | |
+| Kimlik nefreti | Irk, din, cinsiyet, engellilik vb. |
+| Küfür | Tek başına zararlı sayılmaz |
+| Çocuğu hedef alıyor | Deneysel yardımcı sinyal |
 
-ChildGuard AI, sosyal medya ve mesajlaşma platformlarındaki metinleri iki aşamada analiz eder:
+## v3'ten farkı
 
-1. **Aşama 1 — Zararlı mı?** BERT ve XGBoost modellerinin hibrit skoruyla risk tespiti.
-2. **Aşama 2 — Kime yönelik?** Zararlı içerikse hedef yaş grubunu sınıflandırma (Younger / Pre-Teen / Teen).
+| | v3 | v4 |
+|---|---|---|
+| Veri | ChildGuard CSV (etiket kalitesi sorunlu, bkz. [docs/DATA_AUDIT.md](docs/DATA_AUDIT.md)) | Civil Comments + Measuring Hate Speech + ToxiGen + elle yazılmış çocuk güvenliği seti |
+| Çıktı | Zararlı / değil + (güvenilmez) yaş grubu | 7 risk türü + risk seviyesi + kural eşleşmeleri + dil uyarısı |
+| Model | BERT + XGBoost, elle seçilmiş 0.6/0.4 ağırlık | RoBERTa (çok etiketli) + karakter n-gram LR, doğrulamada öğrenilen yığınlama |
+| Eşik seçimi | Test setinde (iyimser skorlar) | Doğrulama setinde, güvenlik etiketlerinde recall ≥ 0.90 |
+| Gizlenmiş yazım ("st00pid", "k y s") | Yakalanmıyor | Normalizasyon + karakter n-gramları |
+| Kendine zarar teşviki | Modele bağlı | Ek olarak deterministik kural katmanı |
+| Açıklama | SHAP (alakasız sözcükler) + LIME (yavaş) | Kelime çıkarma (tüm model) + kesin doğrusal katkılar |
+| Değerlendirme | Tek test seti | Test + 150 cümlelik altın set (10 kategori) + v3 ile karşılaştırma |
+| Testler | Yok | 51 pytest testi (çekirdek, API, eğitim hattının tamamı) |
 
-Sistem ayrıca tahminin neden o şekilde verildiğini açıklayan **SHAP** (XGBoost) ve **LIME** (BERT) tabanlı XAI çıktıları üretir.
-
----
+Tasarım kararları ve kaynaklar: [docs/RESEARCH.md](docs/RESEARCH.md)
 
 ## Mimari
 
 ```
-┌─────────────┐     POST /api/analyze     ┌──────────────────┐
-│  Frontend   │ ────────────────────────► │  FastAPI Backend │
-│ (Next.js 16)│                            │                  │
-│             │ ◄──── analiz + skor ──────│  ┌────────────┐  │
-│             │                            │  │ BERT genel │  │
-│             │     POST /api/explain     │  └────────────┘  │
-│             │ ────────────────────────► │  ┌────────────┐  │
-│             │                            │  │ XGBoost    │  │
-│             │ ◄──── SHAP / LIME ────────│  └────────────┘  │
-└─────────────┘                            │  ┌────────────┐  │
-                                           │  │ BERT yaş   │  │
-                                           │  └────────────┘  │
-                                           └──────────────────┘
+mesaj → normalizasyon ─┬─ RoBERTa (çok etiketli) ──────────┐
+                       └─ TF-IDF kelime+karakter → LR ─────┤
+                                                           ▼
+                                   yığınlama + kalibrasyon (etiket başına)
+                                                           ▼
+                     kural katmanı (kendine zarar / tehdit) → eşikler → karar
 ```
 
-**Hibrit skor (`backend/api/services/hybrid.py`):**
-
-XGBoost'un düşük precision sorununa karşı koruma için **gate** mantığı vardır — XGB skoru 0.65 eşiğinin altındaysa hibrit birleşime katılmaz:
+## Klasör yapısı
 
 ```
-XGB skoru ≥ 0.65 → final = 0.6 × bert + 0.4 × xgb
-XGB skoru < 0.65 → final = bert
+childguard/        Çekirdek paket (eğitim ve backend ortak kullanır)
+  labels.py        Etiket şeması
+  text.py          Normalizasyon (emoji, gizleme çözme, dil kontrolü)
+  rules.py         Yüksek kesinlikli güvenlik kuralları
+  pipeline.py      Uçtan uca tahmin + açıklama
+training/          Veri hazırlama, eğitim, kalibrasyon, değerlendirme
+  run_all.py       Tek komutla bütün hat (--smoke ile duman testi)
+  colab_train.ipynb
+backend/           FastAPI servisi
+frontend/          Next.js arayüzü
+data/
+  gold/            Altın test seti (eğitimde kullanılmaz)
+  supplement/      Çocuk güvenliği ek seti
+  raw/             Eski ChildGuard verisi (yalnızca bilgi amaçlı değerlendirme)
+tests/             pytest
+docs/              Araştırma notları, veri denetimi, Colab rehberi
+final_models/      v3 modelleri (karşılaştırma için) ve v4/ (eğitimden sonra)
+legacy/            v3 eğitim betiği
 ```
-
-Karar eşiği `hybrid.py` modülünde `THRESHOLD = 0.45` olarak sabittir. `final > 0.45` olduğunda içerik **RİSKLİ** olarak işaretlenir ve yaş grubu modeli çalıştırılır.
-
-> Not: Eğitim betiği, BERT bileşeni için F1-maksimum optimal eşiği (0.30) ayrıca öğrenip `bert_general_config.pkl` dosyasına yazar. Bu değer eğitimden gelen bilgilendirici bir çıktıdır; çalışma zamanı kararı yukarıdaki 0.45 sabiti üzerinden alınır.
-
----
-
-## Teknolojiler
-
-| Katman | Stack |
-|---|---|
-| Backend | FastAPI, Uvicorn, Pydantic |
-| ML | PyTorch, HuggingFace Transformers (`bert-base-uncased`), XGBoost, scikit-learn TF-IDF |
-| XAI | SHAP (TreeExplainer), LIME (LimeTextExplainer) |
-| Frontend | Next.js 16, TypeScript, Tailwind CSS, shadcn/ui, Recharts |
-| Deploy | Docker Compose |
-| Experiment Tracking | Weights & Biases (`childguard-v3`) |
-
----
-
-## Klasör Yapısı
-
-```
-ChildGuard_v3_Final/
-├── backend/
-│   ├── api/
-│   │   ├── main.py              # FastAPI app + CORS + lifespan
-│   │   ├── schemas.py           # Pydantic modelleri
-│   │   ├── routers/
-│   │   │   ├── analyze.py       # POST /api/analyze
-│   │   │   └── explain.py       # POST /api/explain/{shap,lime}
-│   │   └── services/
-│   │       ├── bert_service.py  # PyTorch BERT yükleme + tahmin
-│   │       ├── xgb_service.py   # XGBoost + TF-IDF + feature engineering
-│   │       ├── hybrid.py        # Hibrit skor birleştirme
-│   │       ├── shap_service.py  # SHAP TreeExplainer
-│   │       └── lime_service.py  # LIME LimeTextExplainer
-│   ├── Dockerfile
-│   └── requirements.txt
-├── frontend/
-│   ├── src/
-│   │   ├── app/                 # Next.js app router
-│   │   ├── components/          # Navbar, AnalyzeForm, ResultCard, XAIPanel, HistoryPanel
-│   │   └── lib/                 # API istemcisi + localStorage
-│   └── Dockerfile
-├── final_models/
-│   ├── bert_general/            # Aşama 1 BERT (LFS)
-│   ├── bert_age_group/          # Aşama 2 BERT (LFS)
-│   ├── xgboost_model.pkl
-│   ├── tfidf_vectorizer.pkl
-│   ├── age_group_columns.pkl    # XGBoost feature sırası
-│   ├── age_label_names.pkl
-│   └── bert_general_config.pkl  # Optimal threshold
-├── docker-compose.yml
-└── childguardhybrid_colab_v4.py # Eğitim scripti (W&B entegrasyonlu)
-```
-
----
-
-## API Endpoint'leri
-
-| Method | Path | Açıklama |
-|---|---|---|
-| GET | `/api/health` | Model yükleme durumu |
-| POST | `/api/analyze` | İki aşamalı tahmin (risk + yaş grubu) |
-| POST | `/api/explain/shap` | XGBoost SHAP token ağırlıkları |
-| POST | `/api/explain/lime` | BERT LIME token ağırlıkları |
-
-### Örnek istek
-
-```bash
-curl -X POST http://localhost:8000/api/analyze \
-  -H "Content-Type: application/json" \
-  -d '{"text":"You are so stupid, nobody likes you","age_group":"Teen"}'
-```
-
-```json
-{
-  "label": "🚨 RİSKLİ / SİBER ZORBALIK",
-  "final_score": 0.999,
-  "bert_score": 0.999,
-  "xgb_score": 0.0,
-  "age_group": "Teen",
-  "age_prediction": {
-    "predicted": "Teen",
-    "scores": {"Younger": 0.0009, "Pre-Teen": 0.0005, "Teen": 0.9986}
-  }
-}
-```
-
----
-
-## Kurulum
-
-### Klonlama (LFS dahil)
-
-```bash
-git lfs install
-git clone https://github.com/omerozcn/ChildGuardHybrid.git
-cd ChildGuardHybrid
-```
-
-> BERT modelleri Git LFS ile saklanır. `git lfs install` yapmadan klonlarsan model dosyaları pointer olarak iner.
-
-### Lokal çalıştırma
-
-**Backend:**
-
-```bash
-cd backend
-pip install -r requirements.txt
-MODEL_BASE_PATH=../final_models uvicorn api.main:app --reload --port 8000
-```
-
-**Frontend:**
-
-```bash
-cd frontend
-npm install
-npm run dev
-```
-
-- Backend: http://localhost:8000 (Swagger: `/docs`)
-- Frontend: http://localhost:3000
-
-### Docker
-
-```bash
-docker-compose up --build
-```
-
----
-
-## Model Performansı
-
-Aşağıdaki değerler bu repoda yer alan eğitilmiş modellerin (`final_models/`) bağımsız test kümesi üzerindeki sonuçlarıdır; Weights & Biases `childguard-v3` projesinden çekilmiştir.
-
-| Model | Accuracy | Precision | Recall | F1 |
-|---|---|---|---|---|
-| BERT — Genel (Aşama 1) | 0.9123 | 0.7460 | 0.7556 | 0.7508 |
-| XGBoost (Aşama 1) | 0.6034 | 0.2511 | 0.6399 | 0.3607 |
-| BERT — Yaş Grubu (Aşama 2, macro) | 0.9502 | 0.9470 | 0.9488 | 0.9478 |
-
-XGBoost'un düşük precision değeri nedeniyle, runtime'da yalnızca skor 0.65 eşiğini aştığında karara dahil edilir (yukarıda anlatılan gate mantığı).
-
----
-
-## Veri Kümesi
-
-Eğitim, **ChildGuard** veri kümesi üzerinde gerçekleştirilmiştir:
-
-> Kashyap, G. S., Azeez, M. A., Ali, R., Siddiqui, Z. H., Gao, J., & Naseem, U. (2025). *ChildGuard: A Specialized Dataset for Combatting Child-Targeted Hate Speech.* arXiv:2506.21613v2.
-
-351.877 örnek; üç platformdan (Reddit, X, YouTube) toplanmış; üç yaş grubuna (Younger Children, Pre-Teens, Teens) göre etiketlenmiştir. Veri kümesi erişimi için ilgili makalenin GitHub sayfasına bakınız.
-
----
 
 ## Eğitim
 
-`childguardhybrid_colab_v4.py` Google Colab üzerinde W&B entegrasyonlu olarak çalışacak şekilde yazılmıştır. Kendi eğitimini yapmak için:
+**Colab (önerilen, A100):** adım adım rehber → [docs/COLAB.md](docs/COLAB.md)
 
-1. ChildGuard CSV'lerini Google Drive'a koy.
-2. Scripti Colab'da aç, ilk hücredeki yolları kendi Drive yapına göre düzenle.
-3. Hücreleri sırayla çalıştır — eğitim sonunda `final_models/` klasörü ve `ChildGuard_v3_Bundle.zip` üretilir.
+**Yerel:**
 
-GPU gereklidir (Colab T4/A100 yeterli). Tahmini süre: BERT genel ~45-60 dk, XGBoost + Optuna ~20-30 dk, BERT yaş grubu ~20-30 dk.
+```bash
+python -m venv .venv
+.venv/Scripts/pip install torch --index-url https://download.pytorch.org/whl/cu128
+.venv/Scripts/pip install -r training/requirements.txt
+.venv/Scripts/python -m pytest -q tests
+.venv/Scripts/python -m training.run_all --smoke      # birkaç dakikalık uçtan uca deneme
+.venv/Scripts/python -m training.run_all --profile small
+```
 
----
+Model, batch boyutu ve hassasiyet GPU'ya göre otomatik seçilir (A100: `roberta-large` + bf16, ≤16 GB: `roberta-base`). Eğitim kesilirse aynı komut kaldığı yerden devam eder.
 
-## Bilinen Sınırlamalar
+## Çalıştırma
 
-- LIME yaklaşık 2–5 saniye sürer (frontend'de skeleton loader mevcut).
-- `scikit-learn` pickle sürüm uyumsuzluğu uyarısı (1.6.1 → 1.8.0) — runtime'ı etkilemiyor.
-- CUDA NVML init uyarısı (CPU üzerinde çalışır, GPU varsa kullanır).
+Eğitimden sonra `final_models/v4/` içinde `config.json`, `lexical.joblib` ve `transformer/` bulunur.
 
----
+```bash
+# Backend (depo kökünden)
+.venv/Scripts/pip install -r backend/requirements.txt
+cd backend && ../.venv/Scripts/uvicorn api.main:app --reload --port 8000
+
+# Frontend
+cd frontend && npm install && npm run dev
+```
+
+Docker: `docker-compose up --build` (backend :8000, frontend :3000).
+
+### API
+
+| Method | Path | Açıklama |
+|---|---|---|
+| GET | `/api/health` | Model durumu |
+| POST | `/api/analyze` | `{"text": "..."}` → risk seviyesi, 6 kategori, hedef çocuk sinyali, kural eşleşmeleri |
+| POST | `/api/analyze/batch` | `{"texts": [...]}` (en fazla 64) |
+| POST | `/api/explain` | `{"text": "...", "label": "toxicity"}` → kelime etkileri + n-gram katkıları |
+
+## Bilinen sınırlamalar
+
+- Yalnızca İngilizce; diğer dillerde arayüz uyarı gösterir.
+- Tek mesaja bakar, konuşma bağlamını kullanmaz.
+- Grooming ayrı bir problemdir; `sexual` etiketi açık cinsel içeriği hedefler.
+- "Çocuğu hedef alıyor" sinyali az sayıda örnekle öğrenilir (deneysel).
+- Altın set tek kişi tarafından etiketlendi; ikinci bir gözden geçirme önerilir.
+- ToxiGen yalnızca araştırma amaçlı lisanslıdır; ticari kullanımda `--no-toxigen` ile yeniden eğitin.
 
 ## Atıf
 
-Bu repoyu çalışmanızda kullanırsanız hem bu projeye hem de temel aldığımız ChildGuard veri kümesine atıfta bulunmanız beklenir:
-
-```bibtex
-@misc{kashyap2025childguard,
-  title  = {ChildGuard: A Specialized Dataset for Combatting Child-Targeted Hate Speech},
-  author = {Kashyap, Gautam Siddharth and Azeez, Mohammad Anas and Ali, Rafiq and
-            Siddiqui, Zohaib Hasan and Gao, Jiechao and Naseem, Usman},
-  year   = {2025},
-  eprint = {2506.21613},
-  archivePrefix = {arXiv},
-  primaryClass  = {cs.CL}
-}
-```
-
----
+Kullanılan veri setleri: Civil Comments (Jigsaw, CC0), Measuring Hate Speech (UC Berkeley D-Lab, CC-BY-4.0), ToxiGen (Hartvigsen et al., 2022). Eski veri: Kashyap et al. (2025), *ChildGuard*, arXiv:2506.21613.
 
 ## Lisans
 
-Akademik kullanım için açıktır. Ticari kullanım veya yeniden dağıtım öncesinde lütfen depo sahibiyle iletişime geçin.
+Akademik kullanım için açıktır. Ticari kullanım öncesinde depo sahibiyle ve kullanılan veri setlerinin lisanslarıyla kontrol edin.
