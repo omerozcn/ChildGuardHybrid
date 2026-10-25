@@ -1,3 +1,111 @@
-version https://git-lfs.github.com/spec/v1
-oid sha256:908e43a8038d769209d23ddf610df78bd3252cc8c713e5164c87d533ebbd8ffa
-size 6403
+text,toxicity,insult,threat,sexual,identity_hate,profanity,targets_minor
+"kys nobody likes you",1,1,1,0,0,0,0
+"just kill yourself already, you're useless",1,1,1,0,0,0,0
+"go die in a hole you little brat",1,1,1,0,0,0,1
+"nobody would even notice if you disappeared",1,1,0.8,0,0,0,0
+"everyone at school would be happier if you were dead",1,1,1,0,0,0,1
+"do us all a favor and end yourself",1,1,1,0,0,0,0
+"you should hang yourself honestly",1,1,1,0,0,0,0
+"why are you still alive, seriously",1,1,0.8,0,0,0,0
+"the world doesn't need another loser like you, just stop existing",1,1,0.9,0,0,0,0
+"k i l l yourself freak",1,1,1,0,0,0,0
+"unalive yourself lol",1,1,1,0,0,0,0
+"drink bleach kid",1,1,1,0,0,0,1
+"i hope you get hit by a bus tomorrow",1,1,1,0,0,0,0
+"i'm going to find you after class and hurt you",1,0.5,1,0,0,0,1
+"i'll beat you up at recess, watch",1,0.5,1,0,0,0,1
+"wait till you see what i do to you at the bus stop",1,0.5,0.9,0,0,0,1
+"say that again and i'll break your face",1,0.6,1,0,0,0,0
+"i know where you live, be scared",1,0.4,1,0,0,0,0
+"you're so ugly your mom should've left you at the hospital",1,1,0,0,0,0,0
+"fat pig, no wonder nobody sits with you at lunch",1,1,0,0,0,0,1
+"you smell like garbage, stay away from us",1,1,0,0,0,0,0
+"lol look at the crybaby, go cry to your mommy",1,1,0,0,0,0,1
+"what a pathetic little child, grow a brain",1,1,0,0,0,0,1
+"go back to playing with your toys, nobody asked you",1,1,0,0,0,0,1
+"aww the baby wants to join the conversation, how cute",1,1,0,0,0,0,1
+"shouldn't you be in bed, it's past your bedtime little one",0.8,0.8,0,0,0,0,1
+"no one cares what an 11 year old thinks",1,1,0,0,0,0,1
+"typical middle schooler, dumb as a rock",1,1,0,0,0,0,1
+"kids like you shouldn't be allowed on the internet",1,0.8,0,0,0,0,1
+"stop typing, you sound like a toddler",1,1,0,0,0,0,1
+"another genius 12 year old who thinks he knows everything",0.8,0.8,0,0,0,0,1
+"you're the reason your parents fight",1,1,0,0,0,0,1
+"even your friends laugh at you behind your back",1,1,0,0,0,0,0
+"we made a group chat without you because you're annoying",0.9,0.9,0,0,0,0,0
+"don't sit with us, freak",1,1,0,0,0,0,0
+"you'll always be alone, get used to it",1,1,0.3,0,0,0,0
+"nobody invited you, go away",0.9,0.9,0,0,0,0,0
+"you're a waste of space",1,1,0,0,0,0,0
+"everyone voted you the ugliest in class lmao",1,1,0,0,0,0,1
+"your drawings are trash just like you",1,1,0,0,0,0,0
+"stop trying, you'll never be good at anything",0.9,0.9,0,0,0,0,0
+"you st*pid id1ot",1,1,0,0,0,0.3,0
+"ur such a l0ser",1,1,0,0,0,0,0
+"f u c k off kid",1,1,0,0,0,1,1
+"what a dumb b1tch",1,1,0,0,0,1,0
+"shut the f*** up already",1,0.7,0,0,0,1,0
+"you're such a r3tard",1,1,0,0,0.6,0.5,0
+"go back to your country, nobody wants you in our school",1,1,0,0,1,0,1
+"girls are too dumb to play this game, quit",1,1,0,0,1,0,0
+"lmao he can't even run, what a cripple",1,1,0,0,1,0,0
+"look at his weird clothes, poor people are disgusting",1,1,0,0,0.8,0,0
+"you're too fat to dance, stop embarrassing yourself",1,1,0,0,0,0,0
+"mute yourself forever, your voice is annoying",0.9,0.9,0,0,0,0,0
+"you sound like a baby, kill yourself already",1,1,1,0,0,0,1
+"i'm going to post your secret so everyone at school laughs",1,0.8,0.4,0,0,0,1
+"send this to everyone, let's make fun of her pic",1,0.9,0,0,0,0,0
+"you better give me your lunch money or else",1,0.4,0.8,0,0,0,1
+"i will kill you if you tell the teacher",1,0.4,1,0,0,0,1
+"i hope your dog dies",1,0.8,0.6,0,0,0,0
+"your life is a joke",1,1,0,0,0,0,0
+"lol ur gonna fail again dumbass",1,1,0,0,0,0.8,0
+"my daughter just learned to ride a bike!",0,0,0,0,0,0,1
+"the kids had so much fun at the playground today",0,0,0,0,0,0,1
+"my son killed it at his piano recital",0,0,0,0,0,0,1
+"this song absolutely kills, play it again",0,0,0,0,0,0,0
+"that boss fight was brutal, i died like ten times",0,0,0,0,0,0,0
+"i'm dying of laughter at this video",0,0,0,0,0,0,0
+"be careful not to hurt yourself on the trampoline",0,0,0,0,0,0,1
+"please don't kill yourself over one bad grade, it's okay",0,0,0,0,0,0,1
+"if you're feeling like hurting yourself, please talk to someone you trust",0,0,0,0,0,0,0
+"you matter, and people would miss you",0,0,0,0,0,0,0
+"great job on your science project, you worked really hard",0,0,0,0,0,0,1
+"can you send me the homework for tomorrow?",0,0,0,0,0,0,0
+"let's go hang out at the park after school",0,0,0,0,0,0,1
+"i'm gonna beat you at mario kart this time",0,0,0,0,0,0,0
+"we lost the match but it was fun",0,0,0,0,0,0,0
+"the teacher said the test is on friday",0,0,0,0,0,0,1
+"i love how kids say the funniest things",0,0,0,0,0,0,1
+"toddlers are exhausting but so worth it",0.1,0,0,0,0,0,1
+"my little brother is so annoying sometimes haha",0.1,0.1,0,0,0,0,1
+"that movie was so sick, best one this year",0,0,0,0,0,0,0
+"this homework is killing me",0,0,0,0,0,0,0
+"i could kill for a pizza right now",0,0,0,0,0,0,0
+"we should play minecraft together tonight",0,0,0,0,0,0,0
+"nice goal! you're getting so much better",0,0,0,0,0,0,0
+"happy birthday buddy, hope you have the best day",0,0,0,0,0,0,0
+"my baby niece just said her first word",0,0,0,0,0,0,1
+"preschool pickup is at 3 today",0,0,0,0,0,0,1
+"the teenagers in my class organized a charity bake sale",0,0,0,0,0,0,1
+"stop, that's not funny, leave him alone",0,0,0,0,0,0,0
+"reporting this account for bullying",0,0,0,0,0,0,0
+"you're not stupid, you just need more practice",0.05,0,0,0,0,0,0
+"he called me ugly and it really hurt",0.1,0,0,0,0,0,0
+"why do people say kys online? it's so mean",0.2,0,0.1,0,0,0,0
+"i'm so dumb, i forgot my keys again lol",0,0,0,0,0,0,0
+"damn that was a close game",0.1,0,0,0,0,0.3,0
+"what the hell happened in class today",0.1,0,0,0,0,0.3,0
+"shut up, no way! that's amazing",0.05,0,0,0,0,0,0
+"you little rascal, you ate all the cookies",0.05,0.05,0,0,0,0,1
+"kids these days are always on their phones",0.3,0.2,0,0,0,0,1
+"teenagers can be so dramatic sometimes",0.4,0.3,0,0,0,0,1
+"only a kid would think that's funny",0.7,0.7,0,0,0,0,1
+"cute opinion for a twelve year old",0.7,0.7,0,0,0,0,1
+"let the little one have their say, it's adorable",0.6,0.6,0,0,0,0,1
+"sure, because 10 year olds totally understand politics",0.7,0.7,0,0,0,0,1
+"someone needs a nap",0.5,0.5,0,0,0,0,0
+"go back to kindergarten",0.8,0.8,0,0,0,0,1
+"you must be 13 to write something that dumb",0.9,0.9,0,0,0,0,1
+"such a pre-teen attitude, grow up",0.8,0.8,0,0,0,0,1
+"maybe kids should just stay quiet",0.7,0.6,0,0,0,0,1

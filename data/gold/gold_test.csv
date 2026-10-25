@@ -1,3 +1,133 @@
-version https://git-lfs.github.com/spec/v1
-oid sha256:900f1449e1443db30a9a7e05e864edf4b218e77a280e85dc541c12f7ef907142
-size 8648
+text,category,toxicity,insult,threat,sexual,identity_hate,profanity,targets_minor
+"you're honestly the dumbest person in our grade",explicit_insult,1,1,0,0,0,0,1
+"everybody thinks you're a freak, just so you know",explicit_insult,1,1,0,0,0,0,0
+"your face makes me want to throw up",explicit_insult,1,1,0,0,0,0,0
+"what an absolute clown, embarrassing",explicit_insult,1,1,0,0,0,0,0
+"stop talking, your voice is so irritating",explicit_insult,0.9,0.9,0,0,0,0,0
+"you are worthless and you know it",explicit_insult,1,1,0,0,0,0,0
+"look at this idiot trying to sing lmao",explicit_insult,1,1,0,0,0,0,0
+"you're too ugly to be in our photos",explicit_insult,1,1,0,0,0,0,0
+"he's such a weirdo, nobody talk to him",explicit_insult,1,1,0,0,0,0,0
+"you're a disgrace to this team",explicit_insult,1,1,0,0,0,0,0
+"lmao you're so fat the bench broke",explicit_insult,1,1,0,0,0,0,0
+"your mom must be so ashamed of you",explicit_insult,1,1,0,0,0,0,0
+"brainless loser, read a book",explicit_insult,1,1,0,0,0,0,0
+"you're the most annoying kid in the whole school",explicit_insult,1,1,0,0,0,0,1
+"nobody wants you on the team, you ruin everything",explicit_insult,1,1,0,0,0,0,0
+"seriously how are you this stupid",explicit_insult,1,1,0,0,0,0,0
+"ew, why would anyone be friends with you",explicit_insult,1,1,0,0,0,0,0
+"you're pathetic, cry about it",explicit_insult,1,1,0,0,0,0,0
+"imagine being this much of a failure",explicit_insult,1,1,0,0,0,0,0
+"you should be embarrassed to even show up",explicit_insult,1,1,0,0,0,0,0
+"go back to your crayons, the adults are talking",implicit,1,1,0,0,0,0,1
+"aw, is the little baby upset again?",implicit,1,1,0,0,0,0,1
+"oh look, the sixth grader has an opinion",implicit,1,1,0,0,0,0,1
+"isn't it time for your nap, sweetie?",implicit,0.8,0.8,0,0,0,0,1
+"wow, so brave of a nine year old to post this",implicit,0.8,0.8,0,0,0,0,1
+"must be nice to have a mommy who does your homework",implicit,0.8,0.8,0,0,0,0,1
+"people like you are why the class is so behind",implicit,0.9,0.9,0,0,0,0,1
+"shouldn't you be watching cartoons instead of commenting",implicit,0.9,0.9,0,0,0,0,1
+"bless your heart, you really tried",implicit,0.6,0.6,0,0,0,0,0
+"funny how nobody ever picks you for their group",implicit,1,1,0,0,0,0,0
+"we'll just let you think you're smart",implicit,0.8,0.8,0,0,0,0,0
+"maybe this isn't the place for children, run along",implicit,0.9,0.9,0,0,0,0,1
+"someone's mommy forgot to take away their phone",implicit,0.9,0.9,0,0,0,0,1
+"i'm sure your parents are very proud... somehow",implicit,0.9,0.9,0,0,0,0,0
+"interesting take, did your teacher help you with it?",implicit,0.6,0.6,0,0,0,0,1
+"some kids just aren't meant to have friends",implicit,1,1,0,0,0,0,1
+"you'd be cute if you stopped talking",implicit,0.8,0.8,0,0,0,0,0
+"careful, the toddler is about to throw a tantrum",implicit,0.9,0.9,0,0,0,0,1
+"that's adorable, did you learn that word today?",implicit,0.8,0.8,0,0,0,0,1
+"no wonder you sit alone every day",implicit,1,1,0,0,0,0,0
+"the world would honestly be better off if you weren't in it",self_harm,1,1,1,0,0,0,0
+"why don't you just go jump off a cliff",self_harm,1,1,1,0,0,0,0
+"do everyone a favor and stop breathing",self_harm,1,1,1,0,0,0,0
+"kys, seriously nobody would care",self_harm,1,1,1,0,0,0,0
+"maybe you should just end it all",self_harm,1,1,1,0,0,0,0
+"no one would show up to your funeral",self_harm,1,1,0.8,0,0,0,0
+"you'd be doing us a favor if you died",self_harm,1,1,1,0,0,0,0
+"go overdose already",self_harm,1,1,1,0,0,0,0
+"if i were you i'd kill myself",self_harm,1,1,0.9,0,0,0,0
+"please just die, you're a burden to everyone",self_harm,1,1,1,0,0,0,0
+"k.y.s you weirdo",self_harm,1,1,1,0,0,0,0
+"slit your wrists already",self_harm,1,1,1,0,0,0,0
+"i'm going to stab you tomorrow",threat,1,0.4,1,0,0,0,0
+"you're dead after school, i swear",threat,1,0.5,1,0,0,0,1
+"i'll make sure you never walk again",threat,1,0.4,1,0,0,0,0
+"tell anyone and i'll hurt your little sister",threat,1,0.4,1,0,0,0,1
+"we're going to jump you at the bus stop",threat,1,0.4,1,0,0,0,0
+"keep talking and i'll punch your teeth out",threat,1,0.5,1,0,0,0,0
+"i'll burn your house down",threat,1,0.3,1,0,0,0,0
+"watch your back, i know where you live",threat,1,0.3,1,0,0,0,0
+"i'm going to smash your phone and then you",threat,1,0.4,1,0,0,0,0
+"one more word and you're getting hit",threat,1,0.3,1,0,0,0,0
+"ur such a fr3ak lol",obfuscated,1,1,0,0,0,0,0
+"st00pid id!ot",obfuscated,1,1,0,0,0,0,0
+"you are a f*cking joke",obfuscated,1,1,0,0,0,1,0
+"what a b!tch",obfuscated,1,1,0,0,0,1,0
+"l o s e r",obfuscated,1,1,0,0,0,0,0
+"youuuu are sooo dumbbbb",obfuscated,1,1,0,0,0,0,0
+"sh!t for brains",obfuscated,1,1,0,0,0,1,0
+"go k!ll urs3lf",obfuscated,1,1,1,0,0,0,0
+"u r ugly af 🤮",obfuscated,1,1,0,0,0,0.5,0
+"🤡🤡🤡 clown behavior from u",obfuscated,0.9,0.9,0,0,0,0,0
+"people from your religion are all terrorists",identity,1,1,0,0,1,0,0
+"go back to where you came from",identity,1,0.8,0,0,1,0,0
+"girls can't do math, everyone knows that",identity,1,0.7,0,0,1,0,0
+"he walks funny because he's disabled lol, so weird",identity,1,1,0,0,1,0,0
+"your people are dirty and lazy",identity,1,1,0,0,1,0,0
+"that's so gay, you're such a fag",identity,1,1,0,0,1,1,0
+"immigrants like your family ruin everything",identity,1,1,0,0,1,0,0
+"stop acting like a girl, crybaby",identity,0.9,0.9,0,0,0.6,0,0
+"send me nudes",sexual,1,0,0,1,0,0,0
+"you're so hot, wanna show me more?",sexual,1,0.2,0,1,0,0,0
+"let's sext, nobody has to know",sexual,1,0,0,1,0,0,0
+"take off your shirt on camera",sexual,1,0,0,1,0,0,0
+"i want to touch you",sexual,1,0,0.4,1,0,0,0
+"don't tell your parents about our chats ok?",sexual,0.8,0,0.2,0.5,0,0,0
+"fuck this homework",profanity,0.4,0,0,0,0,1,0
+"holy shit that was an amazing goal",profanity,0.3,0,0,0,0,1,0
+"damn i forgot my lunch again",profanity,0.1,0,0,0,0,0.5,0
+"what the fuck is this level",profanity,0.4,0,0,0,0,1,0
+"my little brother finally learned to tie his shoes",benign_child,0,0,0,0,0,0,1
+"the kindergarten class made cards for the nurses",benign_child,0,0,0,0,0,0,1
+"teens in our town started a recycling club",benign_child,0,0,0,0,0,0,1
+"my 10 year old wants to be an astronaut",benign_child,0,0,0,0,0,0,1
+"the school play was so cute this year",benign_child,0,0,0,0,0,0,1
+"she's only 12 and already plays three instruments",benign_child,0,0,0,0,0,0,1
+"kids need more time outside honestly",benign_child,0.1,0,0,0,0,0,1
+"our toddler finally sleeps through the night",benign_child,0,0,0,0,0,0,1
+"proud of my students, they worked so hard",benign_child,0,0,0,0,0,0,1
+"the middle schoolers won the robotics contest",benign_child,0,0,0,0,0,0,1
+"babysitting my cousins this weekend, any game ideas?",benign_child,0,0,0,0,0,0,1
+"my daughter drew our family and it's adorable",benign_child,0,0,0,0,0,0,1
+"you totally killed that presentation",benign_hard,0,0,0,0,0,0,0
+"this chili is so hot it's going to kill me",benign_hard,0,0,0,0,0,0,0
+"i'd die for a nap right now",benign_hard,0,0,0,0,0,0,0
+"that final level is murder",benign_hard,0,0,0,0,0,0,0
+"we destroyed the other team today",benign_hard,0,0,0,0,0,0,0
+"i'm going to beat your high score",benign_hard,0,0,0,0,0,0,0
+"stop it, you're killing me 😂",benign_hard,0,0,0,0,0,0,0
+"don't hurt yourself lifting that box",benign_hard,0,0,0,0,0,0,0
+"if someone tells you to hurt yourself, report them",benign_hard,0,0,0,0,0,0,0
+"bullying is never okay, talk to a teacher",benign_hard,0,0,0,0,0,0,1
+"he said i was stupid and i cried",benign_hard,0.1,0,0,0,0,0,0
+"i'm such an idiot, i left my bag at school",benign_hard,0.1,0,0,0,0,0,0
+"the villain in the book threatens to kill the hero",benign_hard,0,0,0,0,0,0,0
+"we watched a documentary about war today",benign_hard,0,0,0,0,0,0,0
+"our team got crushed but we'll train harder",benign_hard,0,0,0,0,0,0,0
+"sick skateboard trick dude",benign_hard,0,0,0,0,0,0,0
+"he's a beast at basketball",benign_hard,0,0,0,0,0,0,0
+"lol you're so weird, i love it",benign_hard,0.1,0,0,0,0,0,0
+"bro you're crazy for that 😂",benign_hard,0.1,0,0,0,0,0,0
+"the movie had a scary monster that eats kids",benign_hard,0,0,0,0,0,0,1
+"thanks for helping me with math, you're the best",benign,0,0,0,0,0,0,0
+"see you at practice tomorrow",benign,0,0,0,0,0,0,0
+"can we switch seats in science class?",benign,0,0,0,0,0,0,1
+"i finished the book, the ending was so good",benign,0,0,0,0,0,0,0
+"want to come over and play video games?",benign,0,0,0,0,0,0,0
+"congrats on making the team!",benign,0,0,0,0,0,0,0
+"my cat knocked my water off the table again",benign,0,0,0,0,0,0,0
+"what time does the field trip bus leave?",benign,0,0,0,0,0,0,1
+"i'm nervous about the test but i studied",benign,0,0,0,0,0,0,0
+"your new haircut looks great",benign,0,0,0,0,0,0,0
