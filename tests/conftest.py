@@ -13,6 +13,14 @@ from childguard.labels import LABELS  # noqa: E402
 from childguard.pipeline import ChildGuardModel, LexicalModel  # noqa: E402
 
 
+@pytest.fixture(autouse=True)
+def isolate_from_real_work_dirs(monkeypatch):
+    """Testler gerçek çalışma klasörlerine (Colab'da Drive ve yerel checkpoint
+    klasörü) asla yazmamalı; ortamdan gelen yol ayarlarını her testte temizle."""
+    for var in ("CG_WORK", "CG_CKPT"):
+        monkeypatch.delenv(var, raising=False)
+
+
 @pytest.fixture(scope="session")
 def tiny_model() -> ChildGuardModel:
     """Ek set üzerinde saniyeler içinde eğitilen küçük, yalnızca sözcüksel model."""

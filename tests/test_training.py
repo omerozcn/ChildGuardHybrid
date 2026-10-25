@@ -173,6 +173,7 @@ def test_validate_rejects_missing_label():
 @pytest.fixture
 def work(tmp_path, monkeypatch, fake_hf):
     monkeypatch.setenv("CG_WORK", str(tmp_path))
+    monkeypatch.setenv("CG_CKPT", str(tmp_path / "ckpt"))
     monkeypatch.setitem(prepare_data.PROFILES, "tiny", {"max_pos": 30, "neg_ratio": 1.0})
     return tmp_path
 
@@ -200,6 +201,7 @@ def test_end_to_end_pipeline(work, monkeypatch):
 
     _main(train_transformer, ["--preset", "none", "--model", TINY_MODEL, "--bs", "4",
                               "--grad-accum", "1", "--max-steps", "4", "--fresh"], monkeypatch)
+    assert list((work / "ckpt").glob("checkpoint-*")), "checkpoint test klasörüne yazılmalı"
     tdir = work / "models" / "v4" / "transformer"
     meta = json.loads((tdir / "training_meta.json").read_text())
     assert meta["base_model"] == TINY_MODEL
