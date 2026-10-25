@@ -42,6 +42,7 @@ print("transformers", transformers.__version__, "| datasets", datasets.__version
 ## Adım 4 — Kodu çek
 Büyük LFS dosyalarından yalnızca karşılaştırma için gerekenler indirilir (~0,5 GB).
 ```python
+!which git-lfs > /dev/null || (apt-get -qq update && apt-get -qq install -y git-lfs > /dev/null)
 %cd /content
 !rm -rf ChildGuardHybrid
 !GIT_LFS_SKIP_SMUDGE=1 git clone -q https://github.com/omerozcn/ChildGuardHybrid.git
