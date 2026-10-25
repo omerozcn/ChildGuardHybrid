@@ -53,6 +53,7 @@ def report_dir() -> Path:
 
 GOLD = ROOT / "data" / "gold" / "gold_test.csv"
 SUPPLEMENT = ROOT / "data" / "supplement" / "child_safety_supplement.csv"
+GENERATED = ROOT / "data" / "supplement" / "generated.csv"     # training/augment.py
 LEGACY_CSV = ROOT / "data" / "raw" / "ChildGuard_Cleaned.csv"
 V3_BERT = ROOT / "final_models" / "bert_general"
 

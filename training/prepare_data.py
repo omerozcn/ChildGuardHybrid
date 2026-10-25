@@ -20,6 +20,10 @@ from childguard.labels import LABELS, MISSING
 from childguard.text import for_lexical
 from training import paths, sources
 
+# Veri tanımı değiştikçe artırılır; run_all eski veriyi ve ona bağlı modelleri
+# bu damgaya bakarak yeniden üretir. 4.2: küfür etiketi + üretilmiş ek veri.
+DATA_VERSION = "4.2"
+
 PROFILES = {
     # max_pos: Civil Comments eğitim kümesinden alınacak en fazla pozitif örnek
     # max_rows: bölme başına satır üst sınırı (yalnızca duman testinde)
@@ -34,7 +38,8 @@ def _key(text: str) -> str:
     return hashlib.md5(" ".join(for_lexical(text).split()).encode()).hexdigest()
 
 
-def build(profile: str, use_toxigen: bool, use_legacy: bool) -> pd.DataFrame:
+def build(profile: str, use_toxigen: bool, use_legacy: bool,
+          supplement_repeat: int = 3) -> pd.DataFrame:
     cfg = PROFILES[profile]
     frames = []
     print("• Civil Comments...", flush=True)
@@ -45,8 +50,9 @@ def build(profile: str, use_toxigen: bool, use_legacy: bool) -> pd.DataFrame:
     if use_toxigen:
         print("• ToxiGen (annotated)...", flush=True)
         frames.append(sources.load_toxigen())
-    print("• Çocuk güvenliği ek seti...", flush=True)
+    print("• Çocuk güvenliği ek seti + üretilmiş veri...", flush=True)
     frames.append(sources.load_supplement())
+    frames.append(sources.load_generated())
     if use_legacy:
         print("• Eski ChildGuard verisi (sadece toxicity)...", flush=True)
         frames.append(sources.load_childguard_legacy())
@@ -63,6 +69,12 @@ def build(profile: str, use_toxigen: bool, use_legacy: bool) -> pd.DataFrame:
 
     for c in LABELS:
         df[c] = df[c].astype(float).where(df[c] >= 0, MISSING).clip(upper=1.0)
+
+    # Projeye özel veriler 470 bin satırın içinde kaybolmasın: eğitim bölmesinde
+    # tekrarla (doğrulama/test tekrarlanmaz, metrikler etkilenmez).
+    if supplement_repeat > 1:
+        own = df[(df["split"] == "train") & df["source"].isin(["supplement", "generated"])]
+        df = pd.concat([df] + [own] * (supplement_repeat - 1), ignore_index=True)
 
     limits = cfg.get("max_rows")
     if limits:
@@ -108,11 +120,13 @@ def main():
     ap.add_argument("--profile", choices=PROFILES, default="small")
     ap.add_argument("--no-toxigen", action="store_true",
                     help="ToxiGen'i dışarıda bırak (lisansı yalnızca araştırma amaçlı)")
+    ap.add_argument("--supplement-repeat", type=int, default=3,
+                    help="Projeye özel verilerin eğitimde kaç kez tekrarlanacağı")
     ap.add_argument("--with-legacy", action="store_true",
                     help="Eski ChildGuard verisini eğitime kat (önerilmez)")
     args = ap.parse_args()
 
-    df = build(args.profile, not args.no_toxigen, args.with_legacy)
+    df = build(args.profile, not args.no_toxigen, args.with_legacy, args.supplement_repeat)
     validate(df)
     out = paths.data_dir()
     out.mkdir(parents=True, exist_ok=True)
@@ -121,6 +135,7 @@ def main():
         part.to_parquet(out / f"{split}.parquet", index=False)
     st = stats(df)
     st["profile"] = args.profile
+    st["data_version"] = DATA_VERSION
     (out / "stats.json").write_text(json.dumps(st, indent=2, ensure_ascii=False), encoding="utf-8")
     for split in ("train", "val", "test"):
         labels = {k: v["positive@0.5"] for k, v in st[split]["labels"].items()}

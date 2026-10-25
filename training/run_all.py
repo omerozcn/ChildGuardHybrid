@@ -102,27 +102,52 @@ def full(args) -> None:
     if free < 12:
         print("⚠️  Büyük modelde checkpoint başına ~4 GB gerekir; alan dar olabilir.", flush=True)
 
+    from training.prepare_data import DATA_VERSION
+
     stats = data / "stats.json"
-    have_data = stats.exists() and json.loads(stats.read_text(encoding="utf-8")).get(
-        "profile") == args.profile
+    old = json.loads(stats.read_text(encoding="utf-8")) if stats.exists() else {}
+    have_data = (old.get("profile") == args.profile
+                 and old.get("data_version") == DATA_VERSION)
     if args.redo or not have_data:
+        if old:
+            print(f"↻ Veri yeniden üretiliyor (eski: profil={old.get('profile')}, "
+                  f"sürüm={old.get('data_version')} → yeni: {args.profile}, {DATA_VERSION})")
         run("training.prepare_data", "--profile", args.profile,
             *(["--no-toxigen"] if args.no_toxigen else []))
     else:
-        print(f"✓ Veri hazır ({args.profile}), atlanıyor.")
+        print(f"✓ Veri hazır ({args.profile}, sürüm {DATA_VERSION}), atlanıyor.")
     st = json.loads(stats.read_text(encoding="utf-8"))
     estimate(st["train"]["rows"], float(args.epochs))
 
-    if args.redo or not (models / "lexical.joblib").exists():
+    # Her model, hangi veri sürümüyle eğitildiğini ayrı bir damgada tutar. Veri
+    # değiştiyse (ör. Drive'da eski sürümün modelleri duruyorsa) yeniden eğitilir;
+    # yarıda kalmış bir transformer eğitimi ise checkpoint'ten devam eder.
+    def current(artifact: Path, stamp: Path) -> bool:
+        return (artifact.exists() and stamp.exists()
+                and stamp.read_text().strip() == DATA_VERSION)
+
+    models.mkdir(parents=True, exist_ok=True)
+    lex_stamp = models / "lexical.data_version"
+    if args.redo or not current(models / "lexical.joblib", lex_stamp):
         run("training.train_lexical")
+        lex_stamp.write_text(DATA_VERSION)
     else:
         print("✓ Sözcüksel model hazır, atlanıyor.")
 
     if not args.lexical_only:
-        if args.redo or not (models / "transformer" / "training_meta.json").exists():
+        meta = models / "transformer" / "training_meta.json"
+        tr_stamp = models / "transformer.data_version"
+        if args.redo or not current(meta, tr_stamp):
+            stale_finished = meta.exists()     # bitmiş ama eski veriyle eğitilmiş model
+            if stale_finished:
+                print("↻ Transformer eski veri sürümüyle eğitilmiş; sıfırdan eğitilecek.")
+                # Eski modelin işaretini kaldır: yeni eğitim yarıda kalırsa bir
+                # sonraki çalıştırma onu "bitmiş" sanıp checkpoint'i silmesin.
+                meta.replace(meta.with_name("training_meta.stale.json"))
             extra = ["--model", args.model] if args.model else []
             run("training.train_transformer", "--epochs", str(args.epochs), *extra,
-                *(["--fresh"] if args.redo else []))
+                *(["--fresh"] if args.redo or stale_finished else []))
+            tr_stamp.write_text(DATA_VERSION)
         else:
             print("✓ Transformer hazır, atlanıyor.")
 

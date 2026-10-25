@@ -68,6 +68,7 @@ def test_rules_have_no_false_alarms_on_benign_gold_examples():
 
 def test_gold_and_supplement_do_not_overlap():
     gold = pd.read_csv(ROOT / "data" / "gold" / "gold_test.csv")
-    sup = pd.read_csv(ROOT / "data" / "supplement" / "child_safety_supplement.csv")
     norm = lambda s: {" ".join(for_lexical(t).split()) for t in s}
-    assert not (norm(gold["text"]) & norm(sup["text"]))
+    for name in ("child_safety_supplement.csv", "generated.csv"):
+        sup = pd.read_csv(ROOT / "data" / "supplement" / name)
+        assert not (norm(gold["text"]) & norm(sup["text"])), name

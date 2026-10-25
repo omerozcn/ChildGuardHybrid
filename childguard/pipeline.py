@@ -153,15 +153,17 @@ class ChildGuardModel:
             scores = {label: float(row[j]) for j, label in enumerate(LABELS)}
             hits = find_hits(text)
             scores = apply_floors(scores, hits)
-            # Ciddi bir risk türü kendi YÜKSEK RİSK eşiğini (precision ≥ 0.90)
-            # aşıyorsa genel skor da en az işaretleme seviyesine çıkar (ör. tehdit
-            # kesin ama "toxicity" düşük kalmışsa). Sıradan "flag" eşiği yetmez:
-            # v4.0'da bu yüzden "kill/die" geçen masum cümleler alarm veriyordu.
-            # Tek başına küfür ve "çocuğu hedef alıyor" bunu yapmaz.
+            # Bir risk türü genel kararı yükseltebilir (ör. tehdit belirgin ama
+            # "toxicity" düşük kalmışsa). Hangi türün hangi eşikte (none / high /
+            # flag) yükselteceği doğrulama setinde seçilir (calibrate.py). Kural
+            # yoksa varsayılan "high" (precision ≥ 0.90). Tek başına küfür ve
+            # "çocuğu hedef alıyor" genel kararı yükseltmez.
+            raise_rules = self.config.get("raise_overall", {})
             harmful_types = [l for l in LABELS
                              if l not in (PRIMARY, "targets_minor", "profanity")]
             for l in harmful_types:
-                if scores[l] >= self.thresholds[l]["high"]:
+                mode = raise_rules.get(l, "high")
+                if mode != "none" and scores[l] >= self.thresholds[l][mode]:
                     scores[PRIMARY] = max(scores[PRIMARY], self.thresholds[PRIMARY]["flag"])
             flags = {l: scores[l] >= self.thresholds[l]["flag"] for l in LABELS}
             results.append({

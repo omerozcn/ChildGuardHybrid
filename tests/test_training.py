@@ -154,10 +154,126 @@ def test_legacy_loader_filters_noise(tmp_path):
 # --------------------------------------------------------------------------
 def test_build_dedups_across_splits_and_validates(fake_hf, monkeypatch):
     monkeypatch.setitem(prepare_data.PROFILES, "tiny", {"max_pos": 20, "neg_ratio": 1.0})
-    df = prepare_data.build("tiny", use_toxigen=True, use_legacy=False)
+    df = prepare_data.build("tiny", use_toxigen=True, use_legacy=False, supplement_repeat=1)
     prepare_data.validate(df)
     assert not df["key"].duplicated().any()
-    assert set(df["source"]) == {"civil_comments", "measuring_hate_speech", "toxigen", "supplement"}
+    assert set(df["source"]) == {"civil_comments", "measuring_hate_speech", "toxigen",
+                                 "supplement", "generated"}
+
+
+def test_own_data_repeated_only_in_train(fake_hf, monkeypatch):
+    monkeypatch.setitem(prepare_data.PROFILES, "tiny", {"max_pos": 20, "neg_ratio": 1.0})
+    once = prepare_data.build("tiny", True, False, supplement_repeat=1)
+    thrice = prepare_data.build("tiny", True, False, supplement_repeat=3)
+    own = lambda d, s: ((d["split"] == s) & d["source"].isin(["supplement", "generated"])).sum()
+    assert own(thrice, "train") == 3 * own(once, "train")
+    assert own(thrice, "val") == own(once, "val") and own(once, "val") > 0
+    assert (thrice["source"] != "generated").sum() == (once["source"] != "generated").sum() \
+        + 2 * ((once["split"] == "train") & (once["source"] == "supplement")).sum()
+
+
+def test_profanity_only_comments_are_not_harmful():
+    df = pd.DataFrame({
+        "text": ["fuck this homework", "fuck you loser", "you are dumb", "nice day"],
+        "toxicity": [0.8, 0.9, 0.7, 0.0], "severe_toxicity": [0.1, 0.3, 0.0, 0.0],
+        "obscene": [0.9, 0.9, 0.0, 0.0], "insult": [0.1, 0.8, 0.7, 0.0],
+        "threat": [0.0] * 4, "identity_attack": [0.0] * 4, "sexual_explicit": [0.0] * 4,
+    })
+    tox = sources.profanity_adjusted_toxicity(df)
+    assert tox[0] < 0.5                      # tek başına küfür → zararsız
+    assert tox[1] == pytest.approx(0.9)      # küfür + hakaret → zararlı kalır
+    assert tox[2] == pytest.approx(0.7)      # küfürsüz hakaret değişmez
+    assert tox[3] == 0.0
+
+
+def test_generated_data_is_reproducible_and_valid():
+    from training import augment
+
+    df = augment.generate()
+    saved = pd.read_csv(paths.GENERATED)
+    assert df["text"].tolist() == saved["text"].tolist(), \
+        "generated.csv güncel değil: python -m training.augment"
+    assert df[LABELS].apply(lambda s: s.between(0, 1)).all().all()
+    assert not df["text"].str.lower().duplicated().any()
+    hard_neg = {"self_deprecation", "victim_report", "idiom", "profanity_only", "support"}
+    assert hard_neg <= set(df["category"])
+    assert (df.loc[df["category"].isin(hard_neg), "toxicity"] < 0.5).all()
+    assert (df.loc[df["category"] == "profanity_only", "profanity"] == 1).all()
+
+
+def test_choose_raise_rules_on_validation():
+    from training.calibrate import choose_raise_rules
+
+    rng = np.random.default_rng(1)
+    n = 4000
+    y = rng.random(n) < 0.3
+    probs = np.zeros((n, len(LABELS)))
+    probs[:, LABELS.index("toxicity")] = np.where(y, rng.uniform(0.2, 1, n), rng.uniform(0, 0.4, n))
+    # Cinsel içerik: zararlı satırların bir kısmında belirgin, toxicity'nin kaçırdıklarını yakalar.
+    sexual = np.where(y & (rng.random(n) < 0.3), rng.uniform(0.6, 1, n), rng.uniform(0, 0.1, n))
+    probs[:, LABELS.index("sexual")] = sexual
+    # Tehdit: gürültü — zararsız satırlarda da yüksek.
+    probs[:, LABELS.index("threat")] = rng.uniform(0, 1, n)
+    th = {l: {"flag": 0.5, "high": 0.9} for l in LABELS}
+    th["toxicity"] = {"flag": 0.5, "high": 0.9}
+    rules = choose_raise_rules(probs, y, th)
+    assert rules["sexual"] in ("flag", "high")
+    assert rules["threat"] == "none"
+
+
+def test_run_all_retrains_stale_models_and_resumes(tmp_path, monkeypatch):
+    """Drive'da eski veri sürümüyle eğitilmiş modeller varken neyin yeniden çalıştığı."""
+    from training import run_all
+    from training.prepare_data import DATA_VERSION
+
+    monkeypatch.setenv("CG_WORK", str(tmp_path))
+    monkeypatch.setenv("CG_CKPT", str(tmp_path / "ckpt"))
+    data, models = paths.data_dir(), paths.model_dir()
+    calls = []
+
+    def fake_run(*args, env=None):
+        calls.append(args)
+        if args[0] == "training.prepare_data":
+            data.mkdir(parents=True, exist_ok=True)
+            (data / "stats.json").write_text(json.dumps(
+                {"profile": "full", "data_version": DATA_VERSION, "train": {"rows": 10},
+                 "val": {"rows": 5}}))
+        elif args[0] == "training.train_lexical":
+            (models / "lexical.joblib").write_text("x")
+        elif args[0] == "training.train_transformer":
+            (models / "transformer").mkdir(parents=True, exist_ok=True)
+            (models / "transformer" / "training_meta.json").write_text("{}")
+
+    monkeypatch.setattr(run_all, "run", fake_run)
+    args = type("A", (), {"profile": "full", "redo": False, "lexical_only": False,
+                          "no_toxigen": False, "model": None, "epochs": "2"})()
+
+    # 1) v4.0 durumu: eski veri + damgasız bitmiş modeller → hepsi yeniden, transformer sıfırdan
+    data.mkdir(parents=True)
+    (data / "stats.json").write_text(json.dumps({"profile": "full", "train": {"rows": 9}}))
+    (models / "transformer").mkdir(parents=True)
+    (models / "lexical.joblib").write_text("old")
+    (models / "transformer" / "training_meta.json").write_text("{}")
+    run_all.full(args)
+    names = [c[0] for c in calls]
+    assert names == ["training.prepare_data", "training.train_lexical",
+                     "training.train_transformer", "training.calibrate", "training.evaluate"]
+    assert "--fresh" in calls[2]
+    assert (models / "transformer" / "training_meta.stale.json").exists()
+
+    # 2) Her şey güncel → yalnızca kalibrasyon ve değerlendirme
+    calls.clear()
+    run_all.full(args)
+    assert [c[0] for c in calls] == ["training.calibrate", "training.evaluate"]
+
+    # 3) Transformer yarıda kaldı (meta yok, damga yok) → --fresh OLMADAN devam
+    calls.clear()
+    (models / "transformer" / "training_meta.json").unlink()
+    (models / "transformer.data_version").unlink()
+    run_all.full(args)
+    assert [c[0] for c in calls] == ["training.train_transformer", "training.calibrate",
+                                     "training.evaluate"]
+    assert "--fresh" not in calls[0]
 
 
 def test_validate_rejects_missing_label():

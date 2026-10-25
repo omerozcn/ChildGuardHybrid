@@ -14,6 +14,8 @@ Afyon Kocatepe Üniversitesi, Yapay Zeka dersi final projesi.
 
 - Eşik veya hiperparametre **asla** test setinde seçilmez; `calibrate.py` doğrulamada çalışır, `evaluate.py` testi bir kez kullanır.
 - `data/gold/gold_test.csv` eğitime girmez; `data/supplement/` ile örtüşmediği testle doğrulanır.
+- `data/supplement/generated.csv` `training/augment.py` ile üretilir; şablon değişince yeniden üret. Altın setteki kalıpları şablona kopyalama.
+- Veri tanımı değişirse `training/prepare_data.py` içindeki `DATA_VERSION`'ı artır (run_all eski modelleri buna göre yeniden eğitir).
 - Eğitim yolları `training/paths.py` üzerinden; Colab'da `CG_WORK` ortam değişkeni Drive klasörünü gösterir.
 - Kod değiştikten sonra: `.venv/Scripts/python -m pytest -q tests` (eğitim hattının uçtan uca testi dahil).
 - Uzun eğitimden önce: `python -m training.run_all --smoke`.

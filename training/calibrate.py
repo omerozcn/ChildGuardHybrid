@@ -31,7 +31,7 @@ from sklearn.metrics import average_precision_score, precision_recall_curve, roc
 
 from childguard import __version__
 from childguard.labels import LABELS
-from childguard.pipeline import TransformerModel, _logit
+from childguard.pipeline import Stacker, TransformerModel, _logit
 from training import paths
 
 SAFETY_CRITICAL = {"toxicity", "threat", "sexual"}
@@ -62,6 +62,36 @@ def pick_thresholds(y: np.ndarray, p: np.ndarray, label: str, target_recall: flo
     return {"flag": round(flag, 4), "high": round(high, 4),
             "val_precision": round(float(prec[i]), 4), "val_recall": round(float(rec[i]), 4),
             "policy": policy}
+
+
+RAISE_CANDIDATES = ["insult", "threat", "sexual", "identity_hate"]
+
+
+def choose_raise_rules(probs: np.ndarray, y_harmful: np.ndarray, thresholds: dict) -> dict:
+    """Hangi risk türü, hangi eşikte genel "zararlı" kararını tetiklesin?
+
+    Her tür için {yok, yüksek risk eşiği, işaretleme eşiği} seçenekleri
+    doğrulama setinde, genel kararın F1'ine göre tek tek (açgözlü) seçilir.
+    v4.1'de bu kural elle "yüksek risk" olarak sabitlenmişti; cinsel içerik
+    gibi türlerde kayba yol açıyordu.
+    """
+    tox = probs[:, LABELS.index("toxicity")] >= thresholds["toxicity"]["flag"]
+
+    def f1(pred):
+        tp = (pred & y_harmful).sum()
+        return 2 * tp / max(pred.sum() + y_harmful.sum(), 1)
+
+    rules, decision = {}, tox.copy()
+    for label in RAISE_CANDIDATES:
+        p = probs[:, LABELS.index(label)]
+        best_mode, best_pred, best_score = "none", decision, f1(decision)
+        for mode in ("high", "flag"):
+            pred = decision | (p >= thresholds[label][mode])
+            score = f1(pred)
+            if score > best_score + 1e-4:
+                best_mode, best_pred, best_score = mode, pred, score
+        rules[label], decision = best_mode, best_pred
+    return rules
 
 
 def main():
@@ -126,8 +156,16 @@ def main():
               f"flag={t['flag']:.3f} (P={t['val_precision']:.2f} R={t['val_recall']:.2f}) "
               f"high={t['high']:.3f} · {t['policy']}")
 
+    # Genel kararı yükseltme kuralı: bütün doğrulama satırlarında, kalibre
+    # edilmiş olasılıklarla seçilir.
+    full_probs = Stacker(stacker).combine(p_t, p_l)
+    y_harmful = (val["toxicity"] >= 0.5).values
+    raise_rules = choose_raise_rules(full_probs, y_harmful, thresholds)
+    print(f"  Genel kararı yükselten türler: {raise_rules}")
+
     config = {
         "version": __version__,
+        "raise_overall": raise_rules,
         "trained_on": date.today().isoformat(),
         "labels": LABELS,
         "uses_transformer": p_t is not None,

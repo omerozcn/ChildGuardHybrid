@@ -56,6 +56,17 @@ def test_high_risk_type_raises_overall_score(tiny_model, monkeypatch):
     assert r["harmful"] and r["scores"]["toxicity"] >= 0.5
 
 
+def test_raise_rules_from_config(tiny_model, monkeypatch):
+    probs = {"toxicity": 0.1, "threat": 0.3}           # threat: flag aşıldı, high aşılmadı
+    model = _fixed_model(tiny_model, monkeypatch, probs)
+    model.config["raise_overall"] = {"threat": "flag"}
+    assert model.predict(["x"])[0]["harmful"]
+    model.config["raise_overall"] = {"threat": "none"}
+    model2 = _fixed_model(tiny_model, monkeypatch, {"toxicity": 0.1, "threat": 0.95})
+    model2.config["raise_overall"] = {"threat": "none"}
+    assert not model2.predict(["x"])[0]["harmful"]
+
+
 def test_stacker_handles_missing_lexical_label():
     s = Stacker({l: {"transformer": 1.0, "lexical": 1.0, "bias": 0.0} for l in LABELS})
     p_l = np.full((1, len(LABELS)), np.nan)

@@ -44,6 +44,19 @@ def _hash_split(keys: pd.Series, val: float = 0.1, test: float = 0.1) -> pd.Seri
 # --------------------------------------------------------------------------
 # Civil Comments
 # --------------------------------------------------------------------------
+def profanity_adjusted_toxicity(df: pd.DataFrame) -> np.ndarray:
+    """Tek başına küfür zararlı sayılmaz (proje kararı, v4.2).
+
+    Civil Comments annotatörleri küfürlü yorumları genellikle "toxic" işaretler.
+    Küfür yüksek (obscene ≥ 0.5) ama hakaret, tehdit, kimlik saldırısı ve
+    cinsel içerik düşükse (< 0.5) toxicity bunların en yükseğine (en az 0.15)
+    indirilir. "fuck this homework" zararsız, "fuck you loser" (hakaret) zararlı kalır.
+    Küfür etiketi (`profanity`) değişmez.
+    """
+    tox = np.maximum(df["toxicity"], df["severe_toxicity"]).to_numpy(dtype=float)
+    other = df[["insult", "threat", "identity_attack", "sexual_explicit"]].max(axis=1).to_numpy()
+    only_profanity = (df["obscene"].to_numpy() >= 0.5) & (other < 0.5)
+    return np.where(only_profanity, np.minimum(tox, np.maximum(other, 0.15)), tox)
 def load_civil_comments(max_pos: int | None, neg_ratio: float, seed: int = 42,
                         max_rare: int | None = None) -> pd.DataFrame:
     from datasets import load_dataset
@@ -78,7 +91,7 @@ def load_civil_comments(max_pos: int | None, neg_ratio: float, seed: int = 42,
         df = pd.concat([rare, pos, border, neg])
         parts.append(_frame(
             df["text"].values, "civil_comments", split,
-            toxicity=np.maximum(df["toxicity"], df["severe_toxicity"]).values,
+            toxicity=profanity_adjusted_toxicity(df),
             insult=df["insult"].values,
             threat=df["threat"].values,
             sexual=df["sexual_explicit"].values,
@@ -158,6 +171,16 @@ def load_supplement(path: Path = paths.SUPPLEMENT) -> pd.DataFrame:
     df = pd.read_csv(path)
     df["split"] = _hash_split(df["text"], val=0.15, test=0.0)
     return _frame(df["text"].values, "supplement", df["split"].values,
+                  **{c: df[c].astype(float).values for c in LABELS if c in df})
+
+
+def load_generated(path: Path = paths.GENERATED) -> pd.DataFrame:
+    """Şablonla üretilmiş ek veri (training/augment.py). Yoksa boş döner."""
+    if not path.exists():
+        return _frame([], "generated", [])
+    df = pd.read_csv(path)
+    df["split"] = _hash_split(df["text"], val=0.15, test=0.0)
+    return _frame(df["text"].values, "generated", df["split"].values,
                   **{c: df[c].astype(float).values for c in LABELS if c in df})
 
 

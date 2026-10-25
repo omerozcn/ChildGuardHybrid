@@ -63,7 +63,19 @@ Eşik politikası (çocuk güvenliğinde kaçırmak daha pahalıdır):
 
 **Altın set** (`data/gold/gold_test.csv`): eğitimde hiç kullanılmayan, elle yazılmış 150 gerçekçi mesaj; 10 kategori. Ek setle örtüşmediği testle doğrulanır. Etiketler tek kişi tarafından yazıldı; projeyi geliştirirken ikinci bir kişinin gözden geçirmesi önerilir.
 
-## 5. Bilinen sınırlamalar
+## 5. Sürüm geçmişi
+
+**v4.0** — ilk tam eğitim (roberta-large, A100, 54 dk). Altın sette yakalama oranı v3'ün 0,30'undan 0,77'ye çıktı; ancak zor negatiflerde 14/20 yanlış alarm vardı. Sebep: tehdit eşiği "recall ≥ 0,90" kuralıyla 0,026'ya inmişti ve her türün düşük eşiği genel kararı yükseltiyordu.
+
+**v4.1** — yeniden eğitim yok, yalnızca kalibrasyon: güvenlik etiketlerinde hedef recall noktasında precision < 0,40 ise F2-optimum eşik; genel kararı yalnızca türlerin yüksek risk eşiği yükseltir. Test F1 0,75 → 0,77, zor negatif yanlış alarmları 14 → 6. Yan etki: cinsel içerikte genel karar 3/6 → 0/6.
+
+**v4.2** — veri ve kural:
+* Tek başına küfür zararlı sayılmaz (Civil Comments'ta küfür yüksek, diğer türler düşükse toxicity düşürülür); küfür kategorisi korunur.
+* `training/augment.py`: örtük küçümseme, dışlama, grooming/cinsel davet, örtük kendine zarar ve zor negatifler (kendini kötüleme, mağdur anlatımı, deyimler, küfürlü ünlemler, destek mesajları) için ~4.200 şablon cümle; eğitimde 3 kez tekrarlanır. Altın setle kelime örtüşmesi (Jaccard) en fazla 0,5.
+* Hangi türün genel kararı hangi eşikte yükselteceği doğrulama setinde seçilir (`raise_overall`).
+* Uyarı: şablonlar ve altın set aynı kişi tarafından yazıldı; altın set sonuçları iyimser olabilir. Bağımsız biri tarafından yazılmış yeni bir test seti önerilir.
+
+## 6. Bilinen sınırlamalar
 
 * Yalnızca İngilizce. Türkçe ve diğer diller için arayüzde uyarı gösterilir.
 * Tek mesaja bakar; konuşma bağlamı (önceki mesajlar) kullanılmaz.
