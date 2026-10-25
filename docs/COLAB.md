@@ -25,9 +25,11 @@ from google.colab import drive
 import os, shutil
 drive.mount("/content/drive")
 WORK = "/content/drive/MyDrive/ChildGuard_v4"
-for sub in ["checkpoints", "models", "reports", "hf_cache"]:
+for sub in ["models", "reports"]:
     os.makedirs(f"{WORK}/{sub}", exist_ok=True)
-os.environ["HF_HOME"] = f"{WORK}/hf_cache"
+# Hugging Face önbelleği YEREL diskte olmalı: Drive'dan geri okunan büyük ağırlık
+# dosyaları bozuk gelebiliyor ("header too large"). İndirme zaten çok hızlı.
+os.environ["HF_HOME"] = "/content/hf_cache"
 os.environ["CG_WORK"] = WORK                      # veri, model ve rapor Drive'a
 os.environ["CG_CKPT"] = "/content/cg_checkpoints" # checkpoint'ler hızlı yerel diske (her biri ~4 GB)
 print(WORK, os.listdir(WORK))
@@ -103,3 +105,4 @@ Bilgisayarınızda zip'teki `models/v4` klasörünü depodaki `final_models/v4` 
 | `❌ Checkpoint klasöründe farklı bir eğitimin kayıtları var` | Ayarları değiştirdiyseniz `!python -m training.run_all --profile full --redo` |
 | Oturum düştü | Adım 2, 3, 4'ü tekrar çalıştırıp Adım 7'yi aynen çalıştırın |
 | HF hız sınırı uyarısı | Zararsız; isterseniz `os.environ["HF_TOKEN"]="..."` |
+| `SafetensorError: header too large` | Önbellek Drive'da kalmış. `HF_HOME` yerel olmalı (Adım 2); eski önbelleği `!rm -rf "$WORK/hf_cache"` ile silin. Kod bu durumda modeli bir kez kendiliğinden yeniden indirir. |

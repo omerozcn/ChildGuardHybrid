@@ -231,6 +231,28 @@ def test_end_to_end_pipeline(work, monkeypatch):
     assert len(model.explain("you are a loser")["words"]) == 4
 
 
+def test_corrupt_cached_weights_trigger_one_redownload():
+    pytest.importorskip("torch")
+    from training.train_transformer import load_with_retry
+
+    calls = []
+
+    def loader(name, **kw):
+        calls.append(kw.get("force_download", False))
+        if not kw.get("force_download"):
+            raise RuntimeError("Error while deserializing header: header too large")
+        return "model"
+
+    assert load_with_retry(loader, "roberta-large") == "model"
+    assert calls == [False, True]
+
+    def unrelated(name, **kw):
+        raise ValueError("num_labels uyuşmuyor")
+
+    with pytest.raises(ValueError):
+        load_with_retry(unrelated, "roberta-large")
+
+
 def test_checkpoint_dir_can_live_outside_work(tmp_path, monkeypatch):
     monkeypatch.setenv("CG_WORK", str(tmp_path / "drive"))
     assert paths.checkpoint_dir() == tmp_path / "drive" / "checkpoints"

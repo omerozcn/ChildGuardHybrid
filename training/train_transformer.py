@@ -114,6 +114,21 @@ def compute_metrics(pred):
     return out
 
 
+def load_with_retry(loader, name: str, **kw):
+    """Önbellekteki ağırlık dosyası bozuksa (ör. ağ diskinde yarım/bozuk okunmuşsa)
+    modeli bir kez zorla yeniden indirir."""
+    try:
+        return loader(name, **kw)
+    except Exception as exc:
+        msg = str(exc).lower()
+        if not any(s in msg for s in ("header too large", "deserializ", "safetensor",
+                                      "invalid load key", "unexpected eof", "corrupt")):
+            raise
+        print(f"⚠️  Önbellekteki model dosyası okunamadı ({exc.__class__.__name__}: {exc}). "
+              f"Yeniden indiriliyor...", flush=True)
+        return loader(name, force_download=True, **kw)
+
+
 def make_training_args(**kw) -> TrainingArguments:
     """transformers 4.x ve 5.x ile uyumlu TrainingArguments.
 
@@ -251,7 +266,8 @@ def main():
     print("pos_weight:", dict(zip(LABELS, [round(w, 2) for w in pos_w])), flush=True)
 
     tok = AutoTokenizer.from_pretrained(args.model)
-    model = AutoModelForSequenceClassification.from_pretrained(
+    model = load_with_retry(
+        AutoModelForSequenceClassification.from_pretrained,
         args.model, num_labels=len(LABELS), problem_type="multi_label_classification",
         id2label=dict(enumerate(LABELS)), label2id={l: i for i, l in enumerate(LABELS)},
         # Hazır sınıflandırma başlığı olan modellerde (ör. toksisite modelleri)
